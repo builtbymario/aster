@@ -3,8 +3,8 @@ import SwiftUI
 struct SettingsView: View {
     @EnvironmentObject var store: AsterStore
     @AppStorage("AsterLanguage") private var language = "es"
-    @State private var tab = "Inteligencia"
-    private let tabs = ["Inteligencia", "Voces", "Conexiones", "Autonomía"]
+    @State private var tab = "General"
+    private let tabs = ["General", "Conexiones", "Voz y Mac", "Avanzado"]
     private func option<Value>(_ path: WritableKeyPath<IntelligenceSettings, Value>) -> Binding<Value> {
         Binding(get: { store.settings[keyPath: path] }, set: { value in var settings = store.settings; settings[keyPath: path] = value; store.settings = settings })
     }
@@ -14,27 +14,42 @@ struct SettingsView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-                HStack(alignment: .top) {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text(L("Aster, a tu manera.")).font(.system(size: 30, weight: .semibold)).tracking(-0.8)
-                        Text(L("Elige cómo piensa, cómo habla y cuándo trabaja.")).font(.system(size: 12)).foregroundStyle(.secondary)
-                    }
-                    Spacer(); GlassAction(title: "Restaurar copia", symbol: "square.and.arrow.down", action: store.importWorkspace); GlassAction(title: "Guardar copia", symbol: "square.and.arrow.up", action: store.exportWorkspace)
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(L("Aster, a tu manera.")).font(.system(size: 30, weight: .semibold)).tracking(-0.8)
+                    Text(L("Lo esencial está en General; el resto, cuando lo necesites.")).font(.system(size: 12)).foregroundStyle(.secondary)
                 }
                 Picker(L("Ajustes"), selection: $tab) { ForEach(tabs, id: \.self) { Text(L($0)).tag($0) } }.pickerStyle(.segmented).labelsHidden().frame(maxWidth: 460)
-                if tab == "Inteligencia" { intelligence }
-                else if tab == "Voces" { voices }
-                else if tab == "Conexiones" { connections }
-                else { autonomy }
-            }.padding(.horizontal, 22).padding(.top, 9).padding(.bottom, 28)
-        }.scrollIndicators(.hidden).onAppear { if !(store.settings.usesClaude ? AIProvider.anthropic : .openai).hasKey { tab = "Conexiones" } }
+                switch tab {
+                case "Conexiones": connections
+                case "Voz y Mac": voices
+                case "Avanzado": advanced
+                default: general
+                }
+            }.padding(.horizontal, 22).padding(.top, 9).padding(.bottom, 28).frame(maxWidth: 820, alignment: .leading)
+        }.scrollIndicators(.hidden)
     }
-    private var intelligence: some View {
+    /// What most people change: their AI, how deep it thinks, and how it talks to them.
+    private var general: some View {
         VStack(spacing: 18) {
-            card("Su forma de pensar", icon: "sparkle") {
-                ModelPicker()
+            AIConnectionView()
+            card("Tú y Aster", icon: "person.crop.circle") {
+                TextField(L("Cómo quieres que te llame"), text: option(\.userName)).textFieldStyle(.roundedBorder)
+                Picker(L("Idioma de la interfaz"), selection: $language) { ForEach(AsterLanguage.allCases, id: \.rawValue) { Text($0.name).tag($0.rawValue) } }
+                Picker(L("Idioma de las respuestas"), selection: option(\.responseLanguage)) {
+                    Text(L("El de mi mensaje")).tag("auto")
+                    ForEach([("es", "Español"), ("en", "English"), ("fr", "Français"), ("de", "Deutsch"), ("it", "Italiano"), ("pt", "Português"), ("ja", "日本語"), ("zh", "中文")], id: \.0) { Text($0.1).tag($0.0) }
+                }
                 Picker(L("Profundidad"), selection: option(\.effort)) { Text(L("Rápido")).tag("low"); Text(L("Equilibrado")).tag("medium"); Text(L("Profundo")).tag("high") }
+                Picker(L("Tono"), selection: option(\.tone)) { Text(L("Cercano")).tag("warm"); Text(L("Directo")).tag("direct"); Text(L("Profesional")).tag("professional"); Text(L("Creativo")).tag("creative") }
+                Picker(L("Detalle"), selection: option(\.detail)) { Text(L("Breve")).tag("brief"); Text(L("Equilibrado")).tag("balanced"); Text(L("Exhaustivo")).tag("detailed") }
                 Text(L("Más profundidad puede mejorar tareas complejas y aumentar el tiempo y el consumo. Los cambios se aplican en el próximo envío.")).font(.system(size: 11)).foregroundStyle(.secondary).lineSpacing(4)
+            }
+        }
+    }
+    /// Everything else, for people who want to tune how Aster works.
+    private var advanced: some View {
+        VStack(spacing: 18) {
+            card("Cómo trabaja", icon: "sparkle") {
                 if store.settings.usesClaude {
                     Text(L("Claude usa este modelo para el chat, las misiones, el control del Mac y tu pantalla. El chat responde en modo rápido; las misiones, con la profundidad elegida.")).font(.system(size: 11)).foregroundStyle(.secondary).lineSpacing(4)
                 } else {
@@ -48,16 +63,8 @@ struct SettingsView: View {
                 Stepper(LF("Tiempo máximo por misión: %d min", store.settings.maxMinutes), value: option(\.maxMinutes), in: 1...60)
                 Text(LF("Aster solicita la cancelación al alcanzar este tiempo mientras la app está abierta. No es un límite de gasto de %@.", store.settings.providerName)).font(.system(size: 10)).foregroundStyle(.secondary).lineSpacing(4)
             }
-            card("Idioma y personalidad", icon: "bubble.left.and.bubble.right") {
-                Picker(L("Idioma de la interfaz"), selection: $language) { ForEach(AsterLanguage.allCases, id: \.rawValue) { Text($0.name).tag($0.rawValue) } }
-                Picker(L("Idioma de las respuestas"), selection: option(\.responseLanguage)) {
-                    Text(L("El de mi mensaje")).tag("auto")
-                    ForEach([("es", "Español"), ("en", "English"), ("fr", "Français"), ("de", "Deutsch"), ("it", "Italiano"), ("pt", "Português"), ("ja", "日本語"), ("zh", "中文")], id: \.0) { Text($0.1).tag($0.0) }
-                }
-                Picker(L("Tono"), selection: option(\.tone)) { Text(L("Cercano")).tag("warm"); Text(L("Directo")).tag("direct"); Text(L("Profesional")).tag("professional"); Text(L("Creativo")).tag("creative") }
-                Picker(L("Detalle"), selection: option(\.detail)) { Text(L("Breve")).tag("brief"); Text(L("Equilibrado")).tag("balanced"); Text(L("Exhaustivo")).tag("detailed") }
-                TextField(L("Cómo quieres que te llame"), text: option(\.userName)).textFieldStyle(.roundedBorder)
-                Text(L("Tus preferencias e instrucciones")).font(.system(size: 11, weight: .medium))
+            card("Tus instrucciones", icon: "text.quote") {
+                Text(L("Lo que Aster debe tener siempre en cuenta: cómo trabajas, qué estudias, tu estilo…")).font(.system(size: 11)).foregroundStyle(.secondary)
                 TextEditor(text: option(\.instructions)).font(.system(size: 12)).scrollContentBackground(.hidden).frame(height: 85).padding(10).background(.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 12))
             }
             card("Memoria y contexto", icon: "brain") {
@@ -67,11 +74,15 @@ struct SettingsView: View {
                 Toggle(L("Compartir resúmenes de agenda y correo con la IA"), isOn: option(\.shareSources)).toggleStyle(.switch)
                 Text(LF("Al activarlo, los asuntos y remitentes de correo y los títulos y horarios de citas ya revisados se envían a %@ con tus misiones. Las fuentes se conectan por separado.", store.settings.providerName)).font(.system(size: 10)).foregroundStyle(.secondary).lineSpacing(4)
             }
+            autonomy
+            card("Copia de tu espacio", icon: "externaldrive") {
+                Text(L("Guarda tus proyectos, conversaciones, memoria y ajustes en un archivo, o restaura una copia en otro Mac. Las claves no se incluyen.")).font(.system(size: 11)).foregroundStyle(.secondary).lineSpacing(4)
+                HStack { GlassAction(title: "Guardar copia", symbol: "square.and.arrow.up", action: store.exportWorkspace); GlassAction(title: "Restaurar copia", symbol: "square.and.arrow.down", action: store.importWorkspace) }
+            }
         }
     }
     private var connections: some View {
         VStack(spacing: 18) {
-            AIConnectionView()
             RemoteSettingsView(remote: store.remote)
             card("Calendarios de macOS", icon: "calendar") {
                 HStack { Text(L(store.calendarStatus)).font(.system(size: 11)); Spacer(); Button(L(store.state.preferences.watchCalendar ? "Revisar permiso" : "Conectar agenda"), action: store.connectCalendar); if store.state.preferences.watchCalendar { Button(L("Desconectar")) { store.state.preferences.watchCalendar = false; store.calendarStatus = "Sin conectar"; store.save() } } }

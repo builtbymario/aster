@@ -24,7 +24,9 @@ struct MainView: View {
     @State private var choosingAppearance = false
     @FocusState private var composerFocused: Bool
     var showCompanion: () -> Void
-    let pages = [("Personajes", "sparkles"), ("Proyectos", "folder"), ("Actividad", "waveform.path"), ("Misiones", "square.stack.3d.up"), ("Tareas", "checklist"), ("Ordenador", "cursorarrow.motionlines"), ("Memoria", "brain"), ("Bandeja", "tray"), ("Conexiones", "point.3.connected.trianglepath.dotted")]
+    /// The places people use every day; the rest sit below, smaller. Settings live in the toolbar.
+    let pages = [("Personajes", "sparkles"), ("Proyectos", "folder"), ("Misiones", "square.stack.3d.up"), ("Tareas", "checklist"), ("Bandeja", "tray")]
+    let morePages = [("Actividad", "waveform.path"), ("Ordenador", "cursorarrow.motionlines"), ("Memoria", "brain")]
     var body: some View {
         HStack(spacing: 18) {
             sidebar
@@ -55,7 +57,7 @@ struct MainView: View {
         .animation(AsterMotion.spring(reduceMotion), value: store.onboarding)
     }
     /// Display name of a page; the internal identifiers stay unchanged.
-    private func pageTitle(_ page: String) -> String { page == "Personajes" ? "Inicio" : page }
+    private func pageTitle(_ page: String) -> String { ["Personajes": "Inicio", "Conexiones": "Ajustes"][page] ?? page }
     private var sidebar: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 11) {
@@ -83,17 +85,29 @@ struct MainView: View {
                         }
                 }.buttonStyle(FluidButtonStyle()).accessibilityAddTraits(store.page == item.0 ? .isSelected : []).padding(.bottom, 3)
             }
+            if !store.companies.isEmpty {
+                HStack { MonoLabel(L("Proyectos"), size: 9); Spacer() }.padding(.top, 14).padding(.bottom, 6)
+                ForEach(store.companies.prefix(6)) { project in
+                    let open = store.page == "Proyectos" && (store.selectedProject ?? store.companies.first?.id) == project.id
+                    Button { store.selectedProject = project.id; navigate("Proyectos") } label: {
+                        HStack(spacing: 9) {
+                            Image(systemName: project.template.symbol).font(.system(size: 10, weight: .medium)).frame(width: 16).foregroundStyle(open ? Color.asterAccent : muted)
+                            Text(project.name).font(.system(size: 11.5, weight: open ? .semibold : .regular)).lineLimit(1)
+                            Spacer(minLength: 2)
+                            if store.isRunning(store.projectChat(project.id)?.id) { Circle().fill(Color.asterAccent).frame(width: 5, height: 5) }
+                        }.foregroundStyle(open ? Color.primary : Color.secondary).frame(height: 26).padding(.horizontal, 10).contentShape(Rectangle())
+                    }.buttonStyle(FluidButtonStyle())
+                }
+            }
             Spacer(minLength: 10)
-            HStack { MonoLabel(L("Modos"), size: 9); Spacer() }.padding(.bottom, 8)
-            ForEach(Specialist.modeOrder.compactMap { id in store.state.specialists.first { $0.id == id } }) { agent in
-                Button { select(agent.id); navigate("Personajes") } label: {
+            ForEach(morePages, id: \.0) { item in
+                Button { navigate(item.0) } label: {
                     HStack(spacing: 9) {
-                        Image(systemName: agent.symbol).font(.system(size: 10, weight: .medium)).frame(width: 16).foregroundStyle(store.agent.id == agent.id ? Color.asterAccent : muted)
-                        Text(agent.mode).font(.asterMono(11, weight: store.agent.id == agent.id ? .semibold : .regular))
-                        Spacer(minLength: 2)
-                        if store.isAgentWorking(agent.id) { Circle().fill(Color.asterAccent).frame(width: 5, height: 5) }
-                    }.foregroundStyle(store.agent.id == agent.id ? Color.primary : Color.secondary).frame(height: 26).padding(.horizontal, 10).contentShape(Rectangle())
-                }.buttonStyle(FluidButtonStyle()).accessibilityAddTraits(store.agent.id == agent.id ? .isSelected : [])
+                        Image(systemName: item.1).font(.system(size: 10, weight: .medium)).frame(width: 16)
+                        Text(L(item.0)).font(.system(size: 11, weight: store.page == item.0 ? .semibold : .regular))
+                        Spacer(minLength: 0)
+                    }.foregroundStyle(store.page == item.0 ? Color.primary : Color.secondary).frame(height: 24).padding(.horizontal, 10).contentShape(Rectangle())
+                }.buttonStyle(FluidButtonStyle()).accessibilityAddTraits(store.page == item.0 ? .isSelected : [])
             }
             Rectangle().fill(Color.asterHairline).frame(height: 1).padding(.vertical, 16)
             Button(action: showCompanion) {
@@ -121,7 +135,7 @@ struct MainView: View {
                     }.padding(.horizontal, 13).frame(height: 34).liquidSurface(18)
                     GlassIconButton(symbol: AsterAppearance(rawValue: appearance)?.symbol ?? "circle.lefthalf.filled", title: "Apariencia") { choosingAppearance = true }
                         .popover(isPresented: $choosingAppearance, arrowEdge: .bottom) { appearancePicker }
-                    GlassIconButton(symbol: "slider.horizontal.3", title: "Ajustes y conexiones") { navigate("Conexiones") }
+                    GlassIconButton(symbol: "gearshape", title: "Ajustes") { navigate("Conexiones") }
                 }
             }
         }.padding(.horizontal, 10).padding(.top, 12).padding(.bottom, 14)
@@ -176,7 +190,7 @@ struct MainView: View {
                 HStack(spacing: 10) {
                     starter("Pensar una idea", symbol: "lightbulb", text: "Ayúdame a explorar una idea. Empieza con una pregunta útil y propón enfoques concretos.")
                     starter("Crear algo nuevo", symbol: "wand.and.stars", text: "Quiero crear algo original. Ayúdame a encontrar una dirección y convertirla en un primer resultado.")
-                    starter("Hacer avanzar mi empresa", symbol: "arrow.up.right", text: "Ayúdame a elegir el próximo paso de mayor impacto para mi empresa y convertirlo en un plan concreto.")
+                    starter("Hacer avanzar un proyecto", symbol: "arrow.up.right", text: "Ayúdame a elegir el próximo paso de mayor impacto para uno de mis proyectos y convertirlo en un plan concreto.")
                 }
             }.padding(.horizontal, 10).padding(.bottom, 18)
         }.scrollIndicators(.hidden)
@@ -188,7 +202,6 @@ struct MainView: View {
                     .foregroundStyle(Color.asterAccentText).padding(.horizontal, 8).padding(.vertical, 5).background(Color.asterAccentSoft, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
                 Text("Aster").font(.system(size: 32, weight: .semibold)).tracking(-0.9)
                 Text(L(store.agent.detail)).font(.system(size: 12)).foregroundStyle(muted).lineSpacing(5).frame(maxWidth: 300, alignment: .leading).contentTransition(.opacity)
-                MoodPicker(selection: $store.previewMood, tint: Color.asterAccent).padding(.top, 5)
             }.padding(.leading, 25).padding(.vertical, 20)
             Spacer(minLength: 2)
             AvatarStage(style: store.agent.style, mood: store.mood(for: store.agent.id) == .calm ? store.previewMood : store.mood(for: store.agent.id), dimension: 224)
