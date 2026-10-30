@@ -74,9 +74,13 @@ struct SettingsView: View {
                 HStack { Text(L(store.calendarStatus)).font(.system(size: 11)); Spacer(); Button(L(store.state.preferences.watchCalendar ? "Revisar permiso" : "Conectar agenda"), action: store.connectCalendar); if store.state.preferences.watchCalendar { Button(L("Desconectar")) { store.state.preferences.watchCalendar = false; store.calendarStatus = "Sin conectar"; store.save() } } }
                 Text(L("Lee las próximas citas de las cuentas añadidas a Calendario, incluidas Apple, Google y Outlook. Las novedades aparecen en tu bandeja.")).font(.system(size: 11)).foregroundStyle(.secondary).lineSpacing(4)
             }
+            card("Apple Notas", icon: "note.text") {
+                HStack { Text(L(store.notesStatus)).font(.system(size: 11)).lineLimit(3); Spacer(); Button(L(store.state.preferences.watchNotes == true ? "Comprobar Notas" : "Conectar Apple Notas"), action: store.connectNotes); if store.state.preferences.watchNotes == true { Button(L("Desconectar")) { store.state.preferences.watchNotes = false; store.notesStatus = "Sin conectar"; store.save() } } }
+                Text(L("Aster busca y lee tus notas cuando se lo pides y crea notas nuevas (por ejemplo, actas, resúmenes o ideas). No modifica ni borra las existentes.")).font(.system(size: 11)).foregroundStyle(.secondary).lineSpacing(4)
+            }
             card("Apple Mail", icon: "envelope") {
                 HStack { Text(L(store.mailStatus)).font(.system(size: 11)).lineLimit(3); Spacer(); Button(L(store.state.preferences.watchMail ? "Comprobar Mail" : "Conectar Apple Mail"), action: store.connectMail); if store.state.preferences.watchMail { Button(L("Desconectar")) { store.state.preferences.watchMail = false; store.mailStatus = "Sin conectar"; store.save() } } }
-                Text(L("Pídele el último correo, una búsqueda o un resumen: Aster abre el mensaje real y lee su contenido. Funciona con las cuentas añadidas a Mail, incluidas Gmail y Outlook.")).font(.system(size: 11)).foregroundStyle(.secondary).lineSpacing(4)
+                Text(L("Pídele el último correo, una búsqueda o un resumen: Aster abre el mensaje real y lee su contenido. También prepara borradores en Mail para que los revises y los envíes tú; Aster nunca envía correo. Funciona con las cuentas añadidas a Mail, incluidas Gmail y Outlook.")).font(.system(size: 11)).foregroundStyle(.secondary).lineSpacing(4)
             }
             card("Recordatorios de Apple", icon: "checklist") {
                 HStack { Text(L(store.remindersStatus)).font(.system(size: 11)).lineLimit(3); Spacer(); Button(L(store.state.preferences.watchReminders == true ? "Revisar permiso" : "Conectar Recordatorios"), action: store.connectReminders); if store.state.preferences.watchReminders == true { Button(L("Desconectar")) { store.state.preferences.watchReminders = false; store.reminders = []; store.remindersStatus = "Sin conectar"; store.save() } } }

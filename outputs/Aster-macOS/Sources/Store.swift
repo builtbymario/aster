@@ -49,6 +49,7 @@ import Combine
     @Published var attachments: [Attachment] = []
     @Published var speaking = false
     @Published var remindersStatus = "Sin conectar"
+    @Published var notesStatus = "Sin conectar"
     @Published var reminders: [ReminderItem] = []
     private var timer: Timer?
     private var scanning = false
@@ -64,6 +65,8 @@ import Combine
     lazy var screenCapture: () async throws -> Data = { try await ScreenSnapshot.capture() }
     /// The quick chat whose request is operating the Mac, so stopping it stops the Mac too.
     var computerOwner: UUID?
+    /// Opens a Mail draft; replaceable so tests never open Mail.
+    lazy var mailDrafter: ([String], [String], String, String) async throws -> Void = { try await MailDrafts.open(to: $0, cc: $1, subject: $2, body: $3) }
     /// Runs a task on the Mac for the quick chat; replaceable so tests never move the cursor.
     lazy var computerRunner: (String, Specialist, IntelligenceSettings) async -> ComputerRun? = { [weak self] task, mode, settings in await self?.computer.perform(task, agent: mode, settings: settings) }
     let computer = ComputerController()
@@ -120,6 +123,7 @@ import Combine
         if state.preferences.watchReminders == true { remindersStatus = EKEventStore.authorizationStatus(for: .reminder) == .fullAccess ? "Conectado" : "Permiso pendiente" }
         if state.preferences.watchCalendar { calendarStatus = EKEventStore.authorizationStatus(for: .event) == .fullAccess ? "Conectado" : "Permiso pendiente" }
         if state.preferences.watchMail { mailStatus = "Activado · pendiente de revisión" }
+        if state.preferences.watchNotes == true { notesStatus = "Conectado" }
         if startServices {
             timer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in Task { @MainActor in await self?.tick() } }
             refreshConnection()
@@ -222,7 +226,7 @@ import Combine
         return result
     }
     private func inputContext(text: String, company: Company?, attachments: [Attachment], agentID: String) -> String {
-        var context: [String: Any] = ["user_name": settings.userName, "response_language": settings.responseLanguage, "tone": settings.tone, "detail": settings.detail, "local_time": Date().formatted(.iso8601), "time_zone": TimeZone.current.identifier, "connected_sources": ["apple_mail": state.preferences.watchMail, "calendar": state.preferences.watchCalendar, "apple_reminders": state.preferences.watchReminders == true, "apple_health_import": state.health != nil], "modes": state.specialists.map { ["mode": $0.mode, "role": $0.role] }]
+        var context: [String: Any] = ["user_name": settings.userName, "response_language": settings.responseLanguage, "tone": settings.tone, "detail": settings.detail, "local_time": Date().formatted(.iso8601), "time_zone": TimeZone.current.identifier, "connected_sources": ["apple_mail": state.preferences.watchMail, "calendar": state.preferences.watchCalendar, "apple_reminders": state.preferences.watchReminders == true, "apple_notes": state.preferences.watchNotes == true, "apple_health_import": state.health != nil], "modes": state.specialists.map { ["mode": $0.mode, "role": $0.role] }]
         if let company { context["company"] = ["name": company.name, "goal": company.goal, "notes": company.notes] }
         if settings.useMemory {
             context["memory"] = memoryContext(companyID: company?.id)
@@ -556,6 +560,13 @@ import Combine
                 calendarStatus = state.preferences.watchCalendar ? "Conectado" : "Permiso denegado"; save()
                 if state.preferences.watchCalendar { await scan(manual: true) }
             } catch { calendarStatus = error.localizedDescription }
+        }
+    }
+    func connectNotes() {
+        Task {
+            notesStatus = "Solicitando acceso a Apple Notas"
+            do { _ = try await AppleNotes.search("", limit: 1); state.preferences.watchNotes = true; notesStatus = "Conectado"; save() }
+            catch { state.preferences.watchNotes = false; notesStatus = error.localizedDescription; save() }
         }
     }
     func connectMail() {
