@@ -50,7 +50,7 @@ Pasa el cursor por un compañero durante un instante para abrir su minichat comp
 
 **Ventana → Chat rápido** abre el chat del compañero seleccionado. **Hablar con…** permite elegir cualquiera de los seis. Con Aster activa, **⌥⌘J** abre el minichat y **⌥⌘B** pliega o despliega el equipo. Estas acciones también están disponibles en la barra de menús.
 
-El minichat usa el mismo motor, memoria, personalidad, voces y herramientas conectadas de Aster. Mail, Calendarios y Recordatorios siguen necesitando sus conexiones. Para tareas de control del Mac, abre Ordenador: el minichat no afirma haber movido el cursor desde una sesión alojada.
+El minichat es el **chat rápido** de Aster: responde al momento, en directo, sin abrir una sesión alojada para cada pregunta. La conversación se guarda en tu Mac y se envía con cada mensaje; usa la misma memoria, personalidad, voces y herramientas conectadas (Mail, Calendarios, Recordatorios, avisos, Salud importada y búsqueda en internet). Su modelo se elige en Ajustes → Inteligencia → Modelo del chat rápido. No crea archivos ni ejecuta código: para eso, empieza una misión en la ventana principal. Detener corta la respuesta al instante y conserva lo ya escrito; si cierras Aster durante una respuesta, basta con volver a enviar el mensaje. Para tareas de control del Mac, abre Ordenador: el minichat no afirma haber movido el cursor.
 
 ## Escritorio e icono en 0.4.2
 

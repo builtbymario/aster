@@ -50,6 +50,7 @@ import AVFoundation
     lazy var remote = MacRemoteBridge(store: self)
     private let apiFactory: () throws -> AgentAPI
     private func makeAPI() throws -> AgentAPI { try apiFactory() }
+    private let chatFactory: () throws -> ChatProvider
     private let file: URL
     private let writer = SnapshotWriter()
     var onFloatingChange: (() -> Void)?
@@ -63,8 +64,9 @@ import AVFoundation
     }
     var companies: [Company] { state.companies.filter { $0.archived != true } }
     var currentCompany: Company? { companies.first { $0.id == mission?.companyID } }
-    init(directory: URL? = nil, startServices: Bool = true, apiFactory: @escaping () throws -> AgentAPI = { try AgentAPI() }) {
+    init(directory: URL? = nil, startServices: Bool = true, apiFactory: @escaping () throws -> AgentAPI = { try AgentAPI() }, chatFactory: (() throws -> ChatProvider)? = nil) {
         self.apiFactory = apiFactory
+        self.chatFactory = chatFactory ?? { OpenAIChatProvider(api: try apiFactory()) }
         let directory = directory ?? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("Aster")
         file = directory.appendingPathComponent("state.json")
         do {
@@ -80,6 +82,12 @@ import AVFoundation
             }
         } catch { notice = "No se han podido cargar los datos anteriores: \(error.localizedDescription)" }
         for index in state.missions.indices where ["Trabajando", "Cancelación pendiente", "Preparada"].contains(state.missions[index].status) {
+            if state.missions[index].engine == "direct" {
+                // A quick chat has no remote session to recover; the partial answer stays visible.
+                state.missions[index].status = "Detenida"
+                state.missions[index].error = "Aster se cerró mientras respondía. Puedes volver a enviar el mensaje."
+                continue
+            }
             state.missions[index].status = "Por recuperar"
             state.missions[index].error = "La app se cerró durante la misión. Recupera la sesión para ver su estado actual."
         }
@@ -239,6 +247,7 @@ import AVFoundation
         let id = state.missions[index].id
         if desktop { state.desktopChats[requestedAgent.id] = id }
         let usedAgent = state.specialists.first { $0.id == state.missions[index].specialistID } ?? agent
+        if desktop { return runQuick(text, index: index, agent: usedAgent) }
         let configuration = AgentAPI.signature(for: usedAgent, settings: settings)
         var sessionID = state.missions[index].sessionID
         var history = ""
@@ -270,6 +279,43 @@ import AVFoundation
                 await self.complete(id, api: api, proactive: proactive)
             } catch { await self.failed(id, error: error, proactive: proactive) }
             self.finishWork(id)
+        }
+        return true
+    }
+    /// Desktop companions answer through a ChatProvider: streamed, with Aster's local tools, and the transcript kept here.
+    private func runQuick(_ text: String, index: Int, agent: Specialist) -> Bool {
+        let id = state.missions[index].id
+        if let old = state.missions[index].sessionID {
+            state.missions[index].previousSessions = (state.missions[index].previousSessions ?? []) + [old]; state.missions[index].sessionID = nil
+        }
+        let request = ChatTurnRequest(model: settings.quickModel ?? settings.model, effort: QuickChat.effort, instructions: QuickChat.instructions(for: agent, settings: settings),
+                                      history: QuickChat.history(state.missions[index].messages), input: inputContext(text: text, company: nil, attachments: [], agentID: agent.id),
+                                      tools: AgentAPI.functionTools(settings: settings), webSearch: settings.webSearch)
+        state.missions[index].engine = "direct"; state.missions[index].attachmentNames = state.missions[index].attachmentNames ?? []
+        state.missions[index].messages.append(.init(role: "user", text: text))
+        state.missions[index].messages.append(.init(role: "assistant", text: ""))
+        state.missions[index].status = "Trabajando"; state.missions[index].error = nil; state.missions[index].turnID = nil
+        state.missions[index].updated = Date(); state.missions[index].started = Date(); state.missions[index].elapsedSeconds = nil
+        startWork(id); setActivity("Pensando", for: id); save()
+        runtimes[id]?.task = Task { [weak self] in
+            guard let self else { return }
+            do {
+                let provider = try chatFactory()
+                _ = try await provider.respond(request, toolHandler: { [weak self] call in
+                    guard let self else { throw CancellationError() }
+                    return try await self.handleTool("direct-" + id.uuidString, call: call, missionID: id)
+                }, onEvent: { [weak self] event in
+                    switch event {
+                    case .text(let item, let delta): self?.handle(.text(item, delta, false), id: id)
+                    case .activity(let message): self?.setActivity(message, for: id)
+                    }
+                })
+                flush(id); setStatus(id, "Completada"); connectionStatus = "Conectado a OpenAI"; connectionReady = true
+            } catch {
+                if runtimes[id]?.cancelRequested == true { flush(id); setStatus(id, "Detenida") }
+                else { await failed(id, error: error, proactive: false) }
+            }
+            finishWork(id)
         }
         return true
     }
@@ -347,6 +393,7 @@ import AVFoundation
     }
     func stop(missionID: UUID? = nil) {
         guard let item = state.missions.first(where: { $0.id == (missionID ?? selectedMission) }), let runtime = runtimes[item.id], !runtime.cancelRequested else { return }
+        if item.engine == "direct" { runtime.cancelRequested = true; runtime.task?.cancel(); return }
         guard let sid = item.sessionID else { notice = "La sesión aún se está creando. Espera a que aparezca para poder cancelarla sin dejar trabajo remoto."; return }
         runtime.cancelRequested = true
         Task {

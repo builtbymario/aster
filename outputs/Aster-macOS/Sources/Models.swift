@@ -49,6 +49,8 @@ struct Mission: Identifiable, Codable {
     var elapsedSeconds: Double?
     var attachmentNames: [String]?
     var artifactRecords: [AgentArtifact]?
+    /// "direct" for quick chats answered by a ChatProvider; nil for hosted agent sessions.
+    var engine: String?
 }
 struct InboxNote: Identifiable, Codable {
     var id = UUID()
@@ -100,6 +102,8 @@ struct IntelligenceSettings: Codable, Equatable {
     var maxMinutes = 12
     var userName = ""
     var instructions = ""
+    /// Model for the quick chat of the desktop companions; nil uses `model`.
+    var quickModel: String?
 }
 struct MemoryEntry: Identifiable, Codable {
     var id = UUID()
@@ -289,21 +293,22 @@ enum AgentEvent {
     }
 }
 
-struct SSEParser {
-    private(set) var rootTurnID: String?
+/// Splits a server-sent event stream into the data of each complete frame.
+struct ServerSentEvents {
+    var oversizeMessage = "La respuesta supera el tamaño esperado."
     private var dataLines: [String] = []
     private var lineBytes = Data()
-    mutating func feed(_ byte: UInt8) throws -> AgentEvent? {
+    mutating func feed(_ byte: UInt8) throws -> Data? {
         if byte == 10 {
             if lineBytes.last == 13 { lineBytes.removeLast() }
             let line = String(decoding: lineBytes, as: UTF8.self); lineBytes.removeAll(keepingCapacity: true)
             return append(line)
         }
         lineBytes.append(byte)
-        if lineBytes.count > 2_000_000 { throw AsterError.message("La respuesta supera el tamaño esperado. Recupera la sesión para consultar el resultado guardado.") }
+        if lineBytes.count > 2_000_000 { throw AsterError.message(oversizeMessage) }
         return nil
     }
-    mutating func append(_ line: String) -> AgentEvent? {
+    mutating func append(_ line: String) -> Data? {
         if line.isEmpty { return finish() }
         if line.hasPrefix("data:") {
             var value = String(line.dropFirst(5)); if value.hasPrefix(" ") { value.removeFirst() }
@@ -311,13 +316,23 @@ struct SSEParser {
         }
         return nil
     }
-    mutating func finish() -> AgentEvent? {
+    mutating func finish() -> Data {
         if !lineBytes.isEmpty {
             let line = String(decoding: lineBytes, as: UTF8.self); lineBytes.removeAll()
             if line.hasPrefix("data:") { dataLines.append(String(line.dropFirst(5)).trimmingCharacters(in: .whitespaces)) }
         }
         defer { dataLines = [] }
-        let data = Data(dataLines.joined(separator: "\n").utf8)
+        return Data(dataLines.joined(separator: "\n").utf8)
+    }
+}
+
+struct SSEParser {
+    private(set) var rootTurnID: String?
+    private var frames = ServerSentEvents(oversizeMessage: "La respuesta supera el tamaño esperado. Recupera la sesión para consultar el resultado guardado.")
+    mutating func feed(_ byte: UInt8) throws -> AgentEvent? { try frames.feed(byte).flatMap { decode($0) } }
+    mutating func append(_ line: String) -> AgentEvent? { frames.append(line).flatMap { decode($0) } }
+    mutating func finish() -> AgentEvent? { decode(frames.finish()) }
+    private mutating func decode(_ data: Data) -> AgentEvent? {
         if let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
             let turn = object["turn"] as? [String: Any]
             let subagent = object["subagent_id"] ?? turn?["subagent_id"]

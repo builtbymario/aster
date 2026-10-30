@@ -36,6 +36,9 @@ struct SettingsView: View {
                 Picker(L("Modelo"), selection: option(\.model)) { ForEach(models, id: \.self) { Text($0).tag($0) } }
                 Picker(L("Profundidad"), selection: option(\.effort)) { Text(L("Rápido")).tag("low"); Text(L("Equilibrado")).tag("medium"); Text(L("Profundo")).tag("high") }
                 Text(L("Más profundidad puede mejorar tareas complejas y aumentar el tiempo y el consumo. Los cambios se aplican en el próximo envío.")).font(.system(size: 11)).foregroundStyle(.secondary).lineSpacing(4)
+                let quickModels = models + (store.settings.quickModel.map { models.contains($0) ? [] : [$0] } ?? [])
+                Picker(L("Modelo del chat rápido"), selection: Binding(get: { store.settings.quickModel ?? store.settings.model }, set: { value in var settings = store.settings; settings.quickModel = value; store.settings = settings })) { ForEach(quickModels, id: \.self) { Text($0).tag($0) } }
+                Text(L("Los compañeros del escritorio responden al momento con este modelo y Aster guarda la conversación en tu Mac. Las misiones usan el entorno completo de agentes, con archivos y especialistas.")).font(.system(size: 11)).foregroundStyle(.secondary).lineSpacing(4)
                 Toggle(L("Investigar en internet"), isOn: option(\.webSearch)).toggleStyle(.switch)
                 Toggle(L("Permitir que Aster coordine especialistas"), isOn: option(\.delegation)).toggleStyle(.switch)
                 if store.settings.delegation { Stepper(LF("Hasta %d especialistas a la vez", store.settings.maxAgents), value: option(\.maxAgents), in: 1...5) }

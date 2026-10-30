@@ -59,6 +59,15 @@ final class AgentAPI: @unchecked Sendable {
         guard let value = try JSONSerialization.jsonObject(with: data) as? [String: Any] else { throw AsterError.message("La IA devolvió una respuesta no válida.") }
         return value
     }
+    /// Streams a Responses API request as server-sent events.
+    func streamResponse(_ body: [String: Any]) async throws -> URLSession.AsyncBytes {
+        var r = try platformRequest("/responses", body: body); r.setValue("text/event-stream", forHTTPHeaderField: "Accept")
+        let (bytes, response) = try await transport.bytes(for: r)
+        guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
+            var data = Data(); for try await byte in bytes { data.append(byte); if data.count > 64000 { break } }; throw parseError(data)
+        }
+        return bytes
+    }
     func speech(_ text: String, voice: String, instructions: String) async throws -> Data {
         let body: [String: Any] = ["model": "gpt-4o-mini-tts", "input": text, "voice": voice, "instructions": instructions, "response_format": "mp3"]
         let (data, response) = try await transport.data(for: platformRequest("/audio/speech", body: body))
@@ -82,7 +91,8 @@ final class AgentAPI: @unchecked Sendable {
         User's additional preferences: \(settings.instructions.prefix(8000))
         """
     }
-    static func configuration(for specialist: Specialist, settings: IntelligenceSettings) -> [String: Any] {
+    /// Aster's local function tools, shared by hosted missions and the quick chat.
+    static func functionTools(settings: IntelligenceSettings) -> [[String: Any]] {
         var tools: [[String: Any]] = [
             ["type": "function", "name": "aster_workspace", "description": "Read current Aster company context, tasks, memory or source summaries. A source summary is returned only when sharing is enabled in Aster.", "parameters": ["type": "object", "properties": ["query": ["type": "string", "enum": ["company", "tasks", "memory", "sources"]]], "required": ["query"], "additionalProperties": false]],
             ["type": "function", "name": "aster_create_task", "description": "Save a concrete local next action in the current company or personal workspace. This creates a proposal for the user; it does not perform external actions.", "parameters": ["type": "object", "properties": ["title": ["type": "string"]], "required": ["title"], "additionalProperties": false]]
@@ -97,6 +107,10 @@ final class AgentAPI: @unchecked Sendable {
         if settings.automaticMemory {
             tools.append(["type": "function", "name": "aster_remember", "description": "Remember a durable preference or fact only when the user explicitly asks you to remember it. Do not save passwords, credentials or speculative facts.", "parameters": ["type": "object", "properties": ["text": ["type": "string"]], "required": ["text"], "additionalProperties": false]])
         }
+        return tools
+    }
+    static func configuration(for specialist: Specialist, settings: IntelligenceSettings) -> [String: Any] {
+        var tools = functionTools(settings: settings)
         if settings.webSearch { tools.append(["type": "web_search", "mode": "live"]) }
         let enabled = settings.delegation && specialist.id == "director"
         var delegation: [String: Any] = ["enabled": enabled]
