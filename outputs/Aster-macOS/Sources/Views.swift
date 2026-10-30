@@ -172,7 +172,7 @@ struct MainView: View {
                 HStack {
                     MonoLabel(L("Modos"), size: 9)
                     Spacer()
-                    MonoLabel(L("Un compañero · seis modos"), size: 9)
+                    MonoLabel(LF("Un compañero · %d modos", store.state.specialists.count), size: 9)
                 }.padding(.top, 2)
                 agentDock
                 HStack(spacing: 10) {
@@ -199,7 +199,7 @@ struct MainView: View {
         .animation(AsterMotion.spring(reduceMotion), value: store.agent.id)
     }
     private var agentDock: some View {
-        LazyVGrid(columns: [GridItem(.adaptive(minimum: 128), spacing: 8)], spacing: 8) {
+        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 5), spacing: 8) {
             ForEach(Specialist.modeOrder.compactMap { id in store.state.specialists.first { $0.id == id } }) { agent in
                 let selected = store.agent.id == agent.id
                 Button { select(agent.id) } label: {
@@ -207,7 +207,8 @@ struct MainView: View {
                         Image(systemName: agent.symbol).font(.system(size: 13, weight: .medium)).foregroundStyle(selected ? Color.asterAccent : muted)
                         VStack(alignment: .leading, spacing: 2) {
                             Text(agent.mode).font(.asterMono(11, weight: .semibold))
-                            Text(L(agent.role)).font(.system(size: 10)).foregroundStyle(muted).lineLimit(1)
+                            // In English several roles equal the mode's name; the description reads better than a repeat.
+                            Text(L(agent.role).caseInsensitiveCompare(agent.mode) == .orderedSame ? L(agent.detail) : L(agent.role)).font(.system(size: 10)).foregroundStyle(muted).lineLimit(1)
                         }
                     }.frame(maxWidth: .infinity, alignment: .leading).padding(12).frostedSurface(12)
                         .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(selected ? Color.asterAccent : .clear, lineWidth: 1))
