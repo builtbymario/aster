@@ -228,7 +228,7 @@ struct AvatarStage: View {
                 Ellipse().fill(RadialGradient(colors: [Color.asterRing.opacity(0.16), .clear], center: .center, startRadius: 0, endRadius: dimension * 0.5))
                     .frame(width: dimension * 1.2, height: dimension * 0.5).offset(y: dimension * 0.36)
             }
-            CompanionAvatar(style: style, mood: mood, dimension: dimension)
+            CompanionAvatar(style: style, mood: mood, dimension: dimension, framesPerSecond: 30)
         }.frame(width: dimension * 1.3, height: dimension)
     }
 }

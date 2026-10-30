@@ -219,7 +219,7 @@ struct IslandView: View {
     /// The live activity: Aster on the left ear, what it is doing on the right.
     private var ears: some View {
         HStack(spacing: 0) {
-            CompanionAvatar(style: style, mood: mood, dimension: island.layout.notch.height + 4, animateAtRest: true, framesPerSecond: 30)
+            CompanionAvatar(style: style, mood: mood, dimension: island.layout.notch.height + 4, animateAtRest: true, framesPerSecond: 30, restsInBackground: false)
                 .padding(.leading, 12)
             Spacer(minLength: island.layout.notch.width)
             Group {
