@@ -130,7 +130,7 @@ struct SettingsView: View {
                 Picker(L("Presentación"), selection: Binding(get: { store.state.preferences.desktopStyle ?? "island" }, set: { store.applyDesktopStyle?($0) })) {
                     Text(L("Isla dinámica")).tag("island"); Text(L("Mascota flotante")).tag("floating")
                 }.pickerStyle(.segmented)
-                Text(L("La isla vive en el notch de tu MacBook (o arriba en el centro en otras pantallas): pasa el cursor por encima o pulsa ⌥Espacio para hablarle. Mientras Aster escucha, piensa o habla, se ensancha y muestra lo que hace.")).font(.system(size: 11)).foregroundStyle(.secondary).lineSpacing(4)
+                Text(L("La isla vive en el notch de tu MacBook (o arriba en el centro en otras pantallas): pasa el cursor por encima o pulsa ⌥Espacio para hablarle, y se esconde sola al apartar el cursor. Mientras Aster escucha, piensa o habla, se ensancha y muestra lo que hace.")).font(.system(size: 11)).foregroundStyle(.secondary).lineSpacing(4)
             }
             card("Hablar con Aster", icon: "mic") {
                 Toggle(L("⌥Espacio para hablar desde cualquier app"), isOn: Binding(get: { store.state.preferences.voiceShortcut != false }, set: { store.state.preferences.voiceShortcut = $0; store.save(); store.applyVoiceShortcut?($0) })).toggleStyle(.switch)

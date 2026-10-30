@@ -40,4 +40,17 @@ final class IslandTests: XCTestCase {
             XCTAssertTrue(path.contains(CGPoint(x: rect.midX, y: rect.maxY - 1)))
         }
     }
+
+    @MainActor func testTheIslandHidesUnlessThePointerIsOnItOrTheNotch() {
+        let island = CGRect(x: 500, y: 600, width: 440, height: 200), notch = CGRect(x: 620, y: 860, width: 200, height: 38)
+        func stays(_ point: CGPoint, listening: Bool = false, draft: String = "") -> Bool {
+            NotchIsland.staysOpen(pointer: point, island: island, notch: notch, listening: listening, draft: draft)
+        }
+        XCTAssertTrue(stays(CGPoint(x: 700, y: 700)), "On the island")
+        XCTAssertTrue(stays(CGPoint(x: 700, y: 870)), "Pointing at the notch")
+        XCTAssertFalse(stays(CGPoint(x: 100, y: 100)), "Anywhere else it hides, even after typing or sending")
+        XCTAssertTrue(stays(CGPoint(x: 100, y: 100), listening: true), "Not while Aster is listening")
+        XCTAssertTrue(stays(CGPoint(x: 100, y: 100), draft: "Hazme un resumen"), "Not with a message half written")
+        XCTAssertFalse(stays(CGPoint(x: 100, y: 100), draft: "  \n"))
+    }
 }
