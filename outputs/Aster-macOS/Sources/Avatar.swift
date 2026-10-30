@@ -48,15 +48,23 @@ struct CompanionAvatar: View {
     var dimension: CGFloat = 150
     var animateAtRest = true
     var framesPerSecond: Double = 60
+    /// Whether the idle animation stops while another app is in front. Panels meant to be seen
+    /// from other apps (the floating mascot, the island) keep moving.
+    var restsInBackground = true
+    @State private var appActive = NSApplication.shared.isActive
     @Environment(\.accessibilityReduceMotion) var reduceMotion
     @State private var gaze = GazeMotion()
     @State private var visible = false
     @State private var hovering = false
     @State private var previousMood = AvatarMood.calm
     @State private var moodChanged: Double = 0
-    private var animated: Bool { style.motion && !reduceMotion && (animateAtRest || hovering || mood != .calm) }
+    private var animated: Bool { style.motion && !reduceMotion && (animateAtRest && (appActive || !restsInBackground) || hovering || mood != .calm) }
+    /// At rest Aster only breathes, glances and blinks, which reads well at a low frame rate and
+    /// keeps an idle Mac idle; moods and hover get the full rate.
+    private var frameRate: Double { hovering || mood != .calm ? framesPerSecond : min(framesPerSecond, Self.restingFrameRate) }
+    static let restingFrameRate: Double = 12
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / framesPerSecond, paused: !animated || !visible)) { timeline in
+        TimelineView(.animation(minimumInterval: 1.0 / frameRate, paused: !animated || !visible)) { timeline in
             let time = animated ? timeline.date.timeIntervalSinceReferenceDate : 0
             let progress = time == 0 || moodChanged == 0 ? 1 : min(1, max(0, (time - moodChanged) / 0.28))
             let blend = progress * progress * (3 - 2 * progress)
@@ -74,7 +82,9 @@ struct CompanionAvatar: View {
             case .ended: hovering = false; gaze.move(to: .zero)
             }
         }
-        .onAppear { visible = true; previousMood = mood }
+        .onAppear { visible = true; previousMood = mood; appActive = NSApplication.shared.isActive }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in appActive = true }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didResignActiveNotification)) { _ in appActive = false }
         .onDisappear { visible = false }
         .background(WindowAnimationVisibility { visible = $0 })
         .onChange(of: mood) { old, _ in previousMood = old; moodChanged = Date().timeIntervalSinceReferenceDate }

@@ -426,7 +426,7 @@ struct FloatingView: View {
     var hover: (Bool) -> Void
     private var style: AvatarStyle { store.state.specialists.first { $0.id == "director" }?.style ?? AvatarStyle() }
     var body: some View {
-        CompanionAvatar(style: style, mood: store.mood(), dimension: 76, animateAtRest: true, framesPerSecond: 30)
+        CompanionAvatar(style: style, mood: store.mood(), dimension: 76, animateAtRest: true, framesPerSecond: 30, restsInBackground: false)
             .overlay(alignment: .topTrailing) {
                 if store.unread > 0 { Circle().fill(Color.asterAccent).frame(width: 8, height: 8).overlay(Circle().stroke(Color.asterSurface, lineWidth: 1.5)).padding(.top, 12).padding(.trailing, 12) }
             }

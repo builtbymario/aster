@@ -2,6 +2,10 @@
 
 Esta vista previa es nativa para **Apple Silicon e Intel, con macOS 14 o posterior**. Conserva tus personajes, conversaciones, empresas, memoria y preferencias de versiones anteriores. La app está firmada localmente y todavía no está notarizada para distribuirla a otros usuarios. Consulta **INSTALAR.md** antes de trasladarla a otro Mac; Intel se ha compilado, pero no probado en hardware real.
 
+## En desarrollo: rendimiento
+
+Aster en reposo ya casi no gasta: con la app recién abierta en Inicio usaba ~11 % de CPU porque la mascota se redibujaba hasta 60 veces por segundo. Ahora en reposo se anima a 12 fotogramas por segundo (respirar, mirar y parpadear se ven igual) y a ritmo completo solo cuando escucha, piensa, habla o pasas el cursor. Mientras usas otra app, la mascota de la ventana principal se queda quieta; la isla y la mascota flotante siguen vivas. Medido en este Mac: ~5 % con Aster delante y ~0–1 % con Aster detrás de otra app.
+
 ## En desarrollo: una memoria que aprende sola
 
 Aster aprende de lo que le cuentas: qué estudias, en qué trabajas, tus objetivos y cómo te gustan las respuestas. Lo guarda en Memoria marcado como **Aprendido**, lo actualiza cuando cambia (si dices «ya estoy en tercero», sustituye lo de segundo) y te lo enseña debajo de la respuesta («Aster ha aprendido: …») con **Deshacer**. No cuesta peticiones extra: la nota viaja dentro de la misma respuesta y nunca se muestra ni se lee en voz alta. Por seguridad solo aprende de lo que escribes tú: nunca en conversaciones que han leído correo, notas, calendarios, la web o tu pantalla, nunca guarda claves ni números de tarjeta y nunca borra lo que escribiste tú. Lo aprendido en un proyecto se queda en ese proyecto. Se apaga en **Ajustes → Avanzado → Aprender de mis conversaciones**.
