@@ -10,7 +10,7 @@ enum PortableSetup {
         // Another program could plant this file; accept only a private regular file owned by this user.
         guard let attributes = try? FileManager.default.attributesOfItem(atPath: url.path), isTrustedImport(attributes) else { return }
         do {
-            if try CredentialVault.read("openai-api-key") == nil {
+            if !CredentialVault.contains("openai-api-key") {
                 let value = try AgentAPI.keyFromFile(url.path)
                 guard !value.isEmpty else { return }; try CredentialVault.save(Data(value.utf8), account: "openai-api-key")
             }

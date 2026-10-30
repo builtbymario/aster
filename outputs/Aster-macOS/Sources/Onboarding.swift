@@ -72,6 +72,7 @@ struct OnboardingView: View {
     @State private var checking = false
     @State private var problem = ""
     @State private var connected = false
+    @State private var openAtLogin = true
     private var style: AvatarStyle { store.state.specialists.first { $0.id == "director" }?.style ?? AvatarStyle() }
 
     var body: some View {
@@ -194,7 +195,8 @@ struct OnboardingView: View {
                     connector("Notificaciones", "bell", on: store.state.preferences.notifications, action: store.requestNotifications)
                 }
             }
-            Button(L("Empezar a usar Aster"), action: store.finishOnboarding).buttonStyle(AsterButtonStyle(prominent: true, large: true)).keyboardShortcut(.defaultAction)
+            Toggle(L("Abrir Aster al iniciar sesión"), isOn: $openAtLogin).toggleStyle(.switch).font(.system(size: 12))
+            Button(L("Empezar a usar Aster")) { try? LoginItem.set(openAtLogin); store.finishOnboarding() }.buttonStyle(AsterButtonStyle(prominent: true, large: true)).keyboardShortcut(.defaultAction)
         }
     }
 

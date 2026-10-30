@@ -4,6 +4,7 @@ struct SettingsView: View {
     @EnvironmentObject var store: AsterStore
     @AppStorage("AsterLanguage") private var language = "es"
     @State private var tab = "General"
+    @State private var openAtLogin = LoginItem.enabled
     private let tabs = ["General", "Conexiones", "Voz y Mac", "Avanzado"]
     private func option<Value>(_ path: WritableKeyPath<IntelligenceSettings, Value>) -> Binding<Value> {
         Binding(get: { store.settings[keyPath: path] }, set: { value in var settings = store.settings; settings[keyPath: path] = value; store.settings = settings })
@@ -115,7 +116,7 @@ struct SettingsView: View {
                 Button(L("Importar Apple Salud"), action: store.importHealth)
             }
             card("Google", icon: "globe") {
-                Text(L("Gmail y Google Calendar funcionan aquí si sus cuentas ya están añadidas a Mail y Calendario de macOS. La conexión directa de Gmail, Drive y Calendar queda pendiente de la configuración de Google que has dejado para más adelante.")).font(.system(size: 11)).foregroundStyle(.secondary).lineSpacing(4)
+                Text(L("¿Usas Gmail o Google Calendar? Añade la cuenta en Ajustes del Sistema → Cuentas de internet y Aster la leerá a través de Mail y Calendario.")).font(.system(size: 11)).foregroundStyle(.secondary).lineSpacing(4)
             }
             card("Notificaciones", icon: "bell") {
                 HStack { Text(L(store.state.preferences.notifications ? "Activadas" : "Desactivadas")); Spacer(); if store.state.preferences.notifications { Button(L("Desactivar"), action: store.disableNotifications) } else { Button(L("Permitir avisos"), action: store.requestNotifications) } }
@@ -131,6 +132,12 @@ struct SettingsView: View {
                     Text(L("Isla dinámica")).tag("island"); Text(L("Mascota flotante")).tag("floating")
                 }.pickerStyle(.segmented)
                 Text(L("La isla vive en el notch de tu MacBook (o arriba en el centro en otras pantallas): pasa el cursor por encima o pulsa ⌥Espacio para hablarle, y se esconde sola al apartar el cursor. Mientras Aster escucha, piensa o habla, se ensancha y muestra lo que hace.")).font(.system(size: 11)).foregroundStyle(.secondary).lineSpacing(4)
+                Toggle(L("Abrir Aster al iniciar sesión"), isOn: Binding(get: { openAtLogin }, set: { value in
+                    do { try LoginItem.set(value) } catch { store.notice = L("macOS no ha permitido cambiarlo. Revisa Ajustes del Sistema → General → Ítems de inicio.") }
+                    openAtLogin = LoginItem.enabled
+                })).toggleStyle(.switch)
+                if LoginItem.needsApproval { Button(L("Permitirlo en Ajustes del Sistema"), action: LoginItem.openSettings).font(.system(size: 11)) }
+                Text(L("Así la isla, ⌥Espacio, tus avisos y rutinas están listos desde que enciendes el Mac.")).font(.system(size: 11)).foregroundStyle(.secondary).lineSpacing(4)
             }
             card("Hablar con Aster", icon: "mic") {
                 Toggle(L("⌥Espacio para hablar desde cualquier app"), isOn: Binding(get: { store.state.preferences.voiceShortcut != false }, set: { store.state.preferences.voiceShortcut = $0; store.save(); store.applyVoiceShortcut?($0) })).toggleStyle(.switch)
@@ -148,6 +155,12 @@ struct SettingsView: View {
             card("Mientras trabaja en tu Mac", icon: "speaker.wave.2") {
                 Toggle(L("Explicar los pasos en voz alta"), isOn: Binding(get: { store.state.preferences.narrateComputer != false }, set: { store.state.preferences.narrateComputer = $0; if !$0 { store.voice.stop() }; store.save() })).toggleStyle(.switch)
                 Text(L("Usa las voces de macOS durante el control para explicar cada acción sin esperar a generar audio. Los pasos también quedan escritos en pantalla.")).font(.system(size: 11)).foregroundStyle(.secondary).lineSpacing(4)
+            }
+            if !VoicePlayer.hasGoodSystemVoice(for: store.dictationLanguage) {
+                card("Una voz de macOS más natural", icon: "arrow.down.circle") {
+                    Text(L("Este Mac solo tiene la voz básica para este idioma. Descarga una «Mejorada» o «Premium» (son gratis) y Aster la usará sola: Ajustes del Sistema → Accesibilidad → Contenido leído → Voz del sistema → Gestionar voces.")).font(.system(size: 11)).foregroundStyle(.secondary).lineSpacing(4)
+                    Button(L("Abrir Contenido leído")) { NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.Accessibility-Settings.extension?SpokenContent")!) }.font(.system(size: 11))
+                }
             }
         }
     }
@@ -176,7 +189,7 @@ struct SettingsView: View {
                 Text(L("El trabajo autónomo se pausa cuando una misión falla. Revisa la bandeja antes de volver a activarlo.")).font(.system(size: 10)).foregroundStyle(.secondary)
             }
             card("Siempre cerca", icon: "macwindow.on.rectangle") {
-                Text(L("Cerrar la ventana mantiene Aster en la barra de menús. Las revisiones de correo y agenda se realizan cada 15 minutos con el Mac despierto y Aster abierto.")).font(.system(size: 12)).foregroundStyle(.secondary).lineSpacing(5)
+                Text(L("Cerrar la ventana mantiene Aster en la barra de menús. Las revisiones de correo y agenda y las rutinas funcionan con el Mac despierto y Aster abierto; actívalo en Voz y Mac → Abrir Aster al iniciar sesión para no tener que acordarte.")).font(.system(size: 12)).foregroundStyle(.secondary).lineSpacing(5)
                 Text(L(store.settings.usesClaude ? "Con Claude, las misiones se ejecutan desde este Mac y necesitan Aster abierto. Programar trabajo o revisar cuentas con el Mac apagado requiere un servicio en la nube que todavía no está conectado." : "Los agentes ya iniciados trabajan en OpenAI. Las herramientas locales esperan a que Aster vuelva a estar abierto. Programar trabajo nuevo o revisar cuentas con el Mac apagado requiere un servicio en la nube que todavía no está conectado.")).font(.system(size: 11)).foregroundStyle(.secondary).lineSpacing(4)
             }
         }

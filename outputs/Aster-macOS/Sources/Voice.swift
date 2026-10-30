@@ -85,10 +85,19 @@ enum VoiceText {
     func narrate(_ text: String, language: String) { stop(); setActive(true); native(text, language: language) }
     private func native(_ text: String, language: String) {
         let utterance = AVSpeechUtterance(string: text)
-        let options = AVSpeechSynthesisVoice.speechVoices().filter { $0.language.hasPrefix(language) }.sorted { $0.quality.rawValue > $1.quality.rawValue }
-        utterance.voice = options.first ?? AVSpeechSynthesisVoice(language: language); utterance.rate = 0.48
+        utterance.voice = Self.systemVoice(for: language) ?? AVSpeechSynthesisVoice(language: language); utterance.rate = 0.48
         currentUtterance = utterance; synth.speak(utterance)
     }
+    /// The best macOS voice for a language: Premium, then Enhanced, preferring the user's region and
+    /// never a novelty voice.
+    static func systemVoice(for language: String) -> AVSpeechSynthesisVoice? {
+        let region = Locale.current.region?.identifier ?? ""
+        return AVSpeechSynthesisVoice.speechVoices().filter { $0.language.hasPrefix(language) && !$0.voiceTraits.contains(.isNoveltyVoice) }
+            .max { score($0, region) < score($1, region) }
+    }
+    private static func score(_ voice: AVSpeechSynthesisVoice, _ region: String) -> Int { voice.quality.rawValue * 2 + (!region.isEmpty && voice.language.hasSuffix(region) ? 1 : 0) }
+    /// Whether macOS has a natural-sounding voice for the language, or only the basic one.
+    static func hasGoodSystemVoice(for language: String) -> Bool { (systemVoice(for: language)?.quality ?? .default) != .default }
     private func play(_ data: Data) async throws {
         try await withCheckedThrowingContinuation { continuation in
             do { player = try AVAudioPlayer(data: data); player?.delegate = self; player?.prepareToPlay(); completion = continuation; if player?.play() != true { completion = nil; continuation.resume(throwing: AsterError.message("No se ha podido reproducir la voz.")) } }
