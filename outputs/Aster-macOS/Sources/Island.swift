@@ -69,6 +69,9 @@ struct IslandShape: Shape {
     private weak var desktop: DesktopCompanions?
     private var monitors: [Any] = []
     private var closeTask: Task<Void, Never>?
+    /// While open, checks now and then whether the island should still be shown, so it also
+    /// hides when nothing moves (say, once dictation ends).
+    private var watcher: Timer?
     /// The size the island is drawn at right now, reported by its view; hit tests use it.
     var visibleSize = CGSize.zero
     /// Where the island is on screen now, slightly enlarged so the edge is forgiving.
@@ -104,7 +107,7 @@ struct IslandShape: Shape {
 
     var isOpen: Bool { phase == .open }
     func show() { guard phase == .hidden else { return }; phase = .resting; panel.orderFrontRegardless() }
-    func hide() { closeTask?.cancel(); phase = .hidden; panel.ignoresMouseEvents = true; panel.orderOut(nil) }
+    func hide() { closeTask?.cancel(); stopWatching(); phase = .hidden; panel.ignoresMouseEvents = true; panel.orderOut(nil) }
     /// Removes the island for good when the floating mascot is chosen instead.
     func teardown() { hide(); for monitor in monitors { NSEvent.removeMonitor(monitor) }; monitors = []; panel.contentView = nil }
     func open() {
@@ -112,10 +115,11 @@ struct IslandShape: Shape {
         closeTask?.cancel(); relayout()
         phase = .open; panel.ignoresMouseEvents = false; panel.orderFrontRegardless()
         NSHapticFeedbackManager.defaultPerformer.perform(.levelChange, performanceTime: .now)
+        watcher = Timer.scheduledTimer(withTimeInterval: 0.4, repeats: true) { [weak self] _ in Task { @MainActor in self?.review() } }
     }
     func close() {
         guard phase == .open else { return }
-        closeTask?.cancel(); phase = .resting; panel.ignoresMouseEvents = true
+        closeTask?.cancel(); stopWatching(); phase = .resting; panel.ignoresMouseEvents = true
         armed = !layout.hotZone.contains(NSEvent.mouseLocation)
         if panel.isKeyWindow { panel.resignKey() }
     }
@@ -130,25 +134,37 @@ struct IslandShape: Shape {
         case .resting:
             let inside = layout.hotZone.contains(pointer)
             if inside && armed { desktop.showChat(desktop.currentMode) } else if !inside { armed = true }
-        case .open: if visibleFrame.contains(pointer) { closeTask?.cancel() } else { scheduleClose() }
+        case .open: review()
         case .hidden: break
         }
+    }
+    private func stopWatching() { watcher?.invalidate(); watcher = nil }
+    /// The island stays only while the pointer is on it or on the notch, while Aster is listening,
+    /// or while the field holds something not yet sent; otherwise it hides after a moment.
+    static func staysOpen(pointer: CGPoint, island: CGRect, notch: CGRect, listening: Bool, draft: String) -> Bool {
+        island.contains(pointer) || notch.contains(pointer) || listening || !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+    private var staysOpen: Bool {
+        guard let desktop else { return false }
+        return Self.staysOpen(pointer: NSEvent.mouseLocation, island: visibleFrame, notch: layout.hotZone, listening: store.listener.active, draft: desktop.drafts[desktop.currentMode] ?? "")
+    }
+    private func review() {
+        guard phase == .open else { return }
+        if staysOpen { closeTask?.cancel(); closeTask = nil } else { scheduleClose() }
     }
     /// A click anywhere else dismisses the island, unless Aster is listening.
     private func clickedOutside() {
         guard phase == .open, !visibleFrame.contains(NSEvent.mouseLocation), !store.listener.active else { return }
         desktop?.closeChat()
     }
-    /// Leaving the island closes it after a moment, unless it was pinned, is listening or holds a draft.
+    /// Leaving the island hides it after a moment, unless the pointer comes back in time.
     private func scheduleClose() {
         guard closeTask == nil else { return }
         closeTask = Task { [weak self] in
-            do { try await Task.sleep(for: .milliseconds(650)) } catch { return }
+            do { try await Task.sleep(for: .milliseconds(600)) } catch { return }
             guard let self else { return }; self.closeTask = nil
-            guard let desktop = self.desktop, self.phase == .open, !self.visibleFrame.contains(NSEvent.mouseLocation),
-                  !desktop.pinned, !self.store.listener.active,
-                  (desktop.drafts[desktop.currentMode] ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
-            desktop.closeChat()
+            guard self.phase == .open, !self.staysOpen else { return }
+            self.desktop?.closeChat()
         }
     }
 }
