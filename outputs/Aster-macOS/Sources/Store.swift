@@ -412,8 +412,9 @@ import Combine
         return true
     }
     /// Desktop companions answer through a ChatProvider: streamed, with Aster's local tools, and the transcript kept here.
-    /// Applies Aster's hidden notes to the latest answer: clean text, chosen mode and proposed next steps.
-    func applyMarkup(to id: UUID) {
+    /// Applies Aster's hidden notes to the latest answer: clean text, chosen mode, proposed next
+    /// steps and what it learned about the user. `learning` is false for turns the user did not write.
+    func applyMarkup(to id: UUID, learning: Bool = true) {
         guard let index = state.missions.firstIndex(where: { $0.id == id }), let last = state.missions[index].messages.lastIndex(where: { $0.role == "assistant" }) else { return }
         let parsed = AsterMarkup.parse(state.missions[index].messages[last].text)
         state.missions[index].messages[last].text = parsed.text
@@ -421,6 +422,39 @@ import Combine
         runtimes[id]?.parts = [:]; runtimes[id]?.partOrder = []
         if let mode = parsed.mode, state.specialists.contains(where: { $0.id == mode }) { state.missions[index].activeMode = mode }
         state.missions[index].suggestions = parsed.next.isEmpty ? nil : parsed.next
+        state.missions[index].learned = nil
+        if learning { learn(parsed.learn, forget: parsed.unlearn, in: id) }
+    }
+    /// Keeps what Aster learned about the user. Only conversations that heard nothing but the user
+    /// may teach it, so outside content can never plant a memory; Aster only forgets what it learned.
+    func learn(_ facts: [String], forget outdated: [String], in id: UUID) {
+        guard settings.learns, !exposedConversations.contains(id), let index = state.missions.firstIndex(where: { $0.id == id }), !(facts.isEmpty && outdated.isEmpty) else { return }
+        let scope = state.missions[index].companyID
+        func key(_ text: String) -> String { text.lowercased().folding(options: .diacriticInsensitive, locale: nil).filter { $0.isLetter || $0.isNumber } }
+        let dropped = Set(outdated.map(key))
+        state.memories.removeAll { $0.learned == true && dropped.contains(key($0.text)) }
+        var added: [String] = []
+        for fact in facts {
+            let text = String(fact.trimmingCharacters(in: .whitespacesAndNewlines).prefix(300))
+            guard text.count >= 3, !text.contains("sk-"), !ActionPolicy.containsSecret(text), !text.contains("[["),
+                  !state.memories.contains(where: { key($0.text) == key(text) && ($0.companyID == nil || $0.companyID == scope) }) else { continue }
+            state.memories.insert(.init(text: text, companyID: scope, learned: true), at: 0); added.append(text)
+        }
+        // Learned memories stay a manageable size; the oldest go first and what the user wrote is never touched.
+        let learned = state.memories.indices.filter { state.memories[$0].learned == true }
+        if learned.count > Self.learnedLimit { for offset in learned.suffix(learned.count - Self.learnedLimit).reversed() { state.memories.remove(at: offset) } }
+        state.missions[index].learned = added.isEmpty ? nil : added
+        save()
+    }
+    static let learnedLimit = 150
+    /// Undoes one thing Aster just learned.
+    func forgetLearned(_ text: String, in id: UUID) {
+        state.memories.removeAll { $0.learned == true && $0.text == text }
+        if let index = state.missions.firstIndex(where: { $0.id == id }) {
+            state.missions[index].learned?.removeAll { $0 == text }
+            if state.missions[index].learned?.isEmpty == true { state.missions[index].learned = nil }
+        }
+        save()
     }
     /// When a mission started from a quick chat ends, Aster returns to that chat on its own with
     /// what is ready, where to find it and what could come next.
@@ -476,7 +510,7 @@ import Combine
                     case .external: self?.exposedConversations.insert(id)
                     }
                 })
-                flush(id); applyMarkup(to: id); setStatus(id, "Completada"); connectionStatus = "Conectado a " + settings.providerName; connectionReady = true
+                flush(id); applyMarkup(to: id, learning: !hidden); setStatus(id, "Completada"); connectionStatus = "Conectado a " + settings.providerName; connectionReady = true
                 if let mission {
                     followUp(afterMission: id)
                     if mission.proactive, let item = state.missions.first(where: { $0.id == id }) { addNote(title: "El equipo ha preparado una propuesta", text: String((item.messages.last?.text ?? "Abre la misión para revisar el resultado.").prefix(450)), fingerprint: id.uuidString, missionID: id) }

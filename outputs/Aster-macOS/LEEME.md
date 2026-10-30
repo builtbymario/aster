@@ -2,6 +2,10 @@
 
 Esta vista previa es nativa para **Apple Silicon e Intel, con macOS 14 o posterior**. Conserva tus personajes, conversaciones, empresas, memoria y preferencias de versiones anteriores. La app está firmada localmente y todavía no está notarizada para distribuirla a otros usuarios. Consulta **INSTALAR.md** antes de trasladarla a otro Mac; Intel se ha compilado, pero no probado en hardware real.
 
+## En desarrollo: una memoria que aprende sola
+
+Aster aprende de lo que le cuentas: qué estudias, en qué trabajas, tus objetivos y cómo te gustan las respuestas. Lo guarda en Memoria marcado como **Aprendido**, lo actualiza cuando cambia (si dices «ya estoy en tercero», sustituye lo de segundo) y te lo enseña debajo de la respuesta («Aster ha aprendido: …») con **Deshacer**. No cuesta peticiones extra: la nota viaja dentro de la misma respuesta y nunca se muestra ni se lee en voz alta. Por seguridad solo aprende de lo que escribes tú: nunca en conversaciones que han leído correo, notas, calendarios, la web o tu pantalla, nunca guarda claves ni números de tarjeta y nunca borra lo que escribiste tú. Lo aprendido en un proyecto se queda en ese proyecto. Se apaga en **Ajustes → Avanzado → Aprender de mis conversaciones**.
+
 ## En desarrollo: proyectos
 
 **Empresas** se convierte en **Proyectos**: una startup, una carrera, un canal, una investigación o algo personal. Cada proyecto tiene **su propio chat con Aster**, **su equipo de agentes** (Auto elige entre ellos en cada mensaje) y su objetivo, contexto, tareas, memoria y misiones. Al crearlo eliges una plantilla (Empresa o startup, Estudios, Contenido y marca, Investigación, Personal u Otro proyecto), que trae el equipo adecuado y las primeras acciones: plan de estudio, ejercicios, calendario de contenidos, estado del arte… y, en las startups, **Lanzar startup**, que pone a trabajar a todos los departamentos y avisa en el chat del proyecto cuando termina. El equipo se puede cambiar al editar el proyecto. Las misiones que Aster lanza desde el chat de un proyecto quedan en ese proyecto. Tus empresas anteriores se conservan como proyectos de tipo startup.

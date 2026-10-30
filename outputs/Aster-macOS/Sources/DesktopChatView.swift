@@ -125,6 +125,7 @@ struct DesktopChatView: View {
                             Button { NSPasteboard.general.clearContents(); NSPasteboard.general.setString(lastAnswer, forType: .string) } label: { Label(L("Copiar"), systemImage: "doc.on.doc").labelStyle(TightLabelStyle()) }
                             Button { store.speak(lastAnswer, agentID: agentID) } label: { Label(L(store.speaking ? "Detener voz" : "Escuchar"), systemImage: store.speaking ? "stop.fill" : "speaker.wave.2").labelStyle(TightLabelStyle()) }
                         }.font(.system(size: 11)).buttonStyle(.plain).foregroundStyle(Color.asterMuted)
+                        if let learned = mission?.learned, let id = mission?.id { LearnedNote(facts: learned) { store.forgetLearned($0, in: id) } }
                         if let steps = mission?.suggestions, !steps.isEmpty {
                             NextSteps(steps: steps, enabled: store.hasCapacity) { step in if store.sendDesktop(step, agentID: agentID) { desktop.pinned = true } }.padding(.top, 2)
                         }

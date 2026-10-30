@@ -146,6 +146,7 @@ struct ProjectsView: View {
                         } else if let steps = chat?.suggestions, !steps.isEmpty {
                             NextSteps(steps: steps, enabled: store.hasCapacity) { step in store.sendProject(step, projectID: project.id) }.frame(maxWidth: 560, alignment: .leading)
                         }
+                        if !working, let learned = chat?.learned, let id = chat?.id { LearnedNote(facts: learned) { store.forgetLearned($0, in: id) } }
                         if let error = chat?.error, !error.isEmpty { Label(L(error), systemImage: "exclamationmark.circle").font(.system(size: 12)).foregroundStyle(.orange) }
                         Color.clear.frame(height: 1).id("end")
                     }.padding(.horizontal, 26).padding(.vertical, 20).frame(maxWidth: 760, alignment: .leading).frame(maxWidth: .infinity)

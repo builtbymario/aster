@@ -254,3 +254,21 @@ struct NextSteps: View {
         }
     }
 }
+
+/// What Aster just learned about the user, quietly shown under its answer with a way to undo it.
+struct LearnedNote: View {
+    var facts: [String]
+    var tint: Color = .asterMuted
+    var undo: (String) -> Void
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            ForEach(facts, id: \.self) { fact in
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Image(systemName: "brain").font(.system(size: 9, weight: .medium))
+                    Text(L("Aster ha aprendido:") + " " + fact).font(.system(size: 10.5)).lineLimit(2)
+                    Button(L("Deshacer")) { undo(fact) }.buttonStyle(.plain).font(.system(size: 10.5, weight: .medium)).foregroundStyle(Color.asterRing)
+                }.foregroundStyle(tint)
+            }
+        }.accessibilityElement(children: .contain)
+    }
+}
