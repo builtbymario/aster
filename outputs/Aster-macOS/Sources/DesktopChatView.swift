@@ -139,6 +139,12 @@ struct DesktopChatView: View {
             HStack(alignment: .bottom, spacing: 6) {
                 DesktopComposer(text: draft, placeholder: L("Pregunta a Aster…"), send: { desktop.send() }, close: { desktop.closeChat() }, editing: { desktop.pinned = true })
                     .frame(minHeight: 30, maxHeight: 44).padding(.leading, 4)
+                Button { desktop.shareScreen.toggle() } label: {
+                    Image(systemName: desktop.shareScreen ? "eye.fill" : "eye").font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(desktop.shareScreen ? Color.asterOnAccent : Color.primary).frame(width: 30, height: 30)
+                        .background(desktop.shareScreen ? Color.asterAccent : Color.asterSurface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(desktop.shareScreen ? Color.clear : Color.asterHairlineStrong, lineWidth: 0.5))
+                }.buttonStyle(FluidButtonStyle()).accessibilityLabel(L("Preguntar sobre mi pantalla")).help(L("Preguntar sobre mi pantalla"))
                 DictationButton(listener: store.listener) { desktop.dictate(agentID) }
                 if working {
                     Button { store.stop(missionID: mission?.id) } label: {
@@ -155,8 +161,8 @@ struct DesktopChatView: View {
                 }
             }.padding(6)
                 .background(Color.asterCanvas, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-                .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(store.listener.active ? Color.asterAccent : Color.asterHairlineStrong, lineWidth: store.listener.active ? 1 : 0.5))
-            MonoLabel(L("↵ enviar · ⇧↵ línea · ⌥espacio hablar"), size: 9).padding(.leading, 4)
+                .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(store.listener.active || desktop.shareScreen ? Color.asterAccent : Color.asterHairlineStrong, lineWidth: store.listener.active || desktop.shareScreen ? 1 : 0.5))
+            MonoLabel(L(desktop.shareScreen ? "Se enviará una captura de tu pantalla" : "↵ enviar · ⇧↵ línea · ⌥espacio hablar"), color: desktop.shareScreen ? .asterAccent : .asterMuted, size: 9).padding(.leading, 4)
         }
     }
     private var prompts: [(String, String)] {

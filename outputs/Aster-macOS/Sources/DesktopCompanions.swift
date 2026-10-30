@@ -30,6 +30,8 @@ import QuartzCore
     @Published private(set) var collapsed: Bool
     @Published private(set) var activeChatID: String?
     @Published var pinned = false
+    /// The next message goes with a screenshot of the screen; it resets after sending.
+    @Published var shareScreen = false
     @Published private(set) var drafts: [String: String]
     var visibleCount: Int { collapsed ? 0 : 1 }
     /// The mode the chat shows: the open one, or the one selected in Aster.
@@ -208,7 +210,7 @@ import QuartzCore
     func send() {
         guard let id = activeChatID, let text = drafts[id], !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
         flushDrafts()
-        if store.sendDesktop(text, agentID: id) { pinned = true; drafts[id] = ""; flushDrafts() }
+        if store.sendDesktop(text, agentID: id, screen: shareScreen) { pinned = true; shareScreen = false; drafts[id] = ""; flushDrafts() }
     }
     /// Push-to-talk: opens the chat in the current mode, writes the words into its draft as they are
     /// heard, and sends them after a pause. Calling it again while listening finishes early.
@@ -220,7 +222,7 @@ import QuartzCore
         store.startDictation(onUpdate: { [weak self] heard in self?.setDraft(prefix + heard, agentID: id) }, onFinish: { [weak self] heard in
             guard let self else { return }
             setDraft(prefix + heard, agentID: id); flushDrafts()
-            if store.sendDesktop(prefix + heard, agentID: id, spoken: true) { drafts[id] = ""; flushDrafts() }
+            if store.sendDesktop(prefix + heard, agentID: id, spoken: true, screen: shareScreen) { shareScreen = false; drafts[id] = ""; flushDrafts() }
         })
     }
     /// Switches the chat to another mode, which becomes Aster's selected mode too.

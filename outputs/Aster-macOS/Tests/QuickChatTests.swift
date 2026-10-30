@@ -141,6 +141,43 @@ final class QuickChatTests: XCTestCase {
         catch { XCTAssertTrue(error.localizedDescription.contains("interrumpió"), error.localizedDescription) }
     }
 
+    @MainActor func testAScreenshotTravelsWithItsTurnOnly() async throws {
+        StreamMockProtocol.reset([(200, Self.stream([["type": "response.created", "response": ["id": "resp_s"]], ["type": "response.output_text.delta", "item_id": "m", "delta": "Es un error de tipos."], ["type": "response.completed", "response": ["id": "resp_s"]]]))])
+        var request = Self.request(webSearch: false); request.images = [Data("jpeg-bytes".utf8)]
+        _ = try await Self.provider().respond(request, toolHandler: { _ in "" }, onEvent: { _ in })
+        let input = try XCTUnwrap(StreamMockProtocol.bodies.first?["input"] as? [[String: Any]])
+        XCTAssertTrue(input.dropLast().allSatisfy { $0["content"] is String }, "Earlier turns stay text only")
+        let content = try XCTUnwrap(input.last?["content"] as? [[String: Any]])
+        XCTAssertEqual(content.first?["type"] as? String, "input_text"); XCTAssertEqual(content.first?["text"] as? String, "Explícame la derivada")
+        XCTAssertEqual(content.last?["type"] as? String, "input_image")
+        XCTAssertEqual(content.last?["image_url"] as? String, "data:image/jpeg;base64," + Data("jpeg-bytes".utf8).base64EncodedString())
+    }
+
+    @MainActor func testAskingAboutTheScreenCapturesOnlyWhenRequested() async throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("aster-screen-" + UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let provider = ScriptedChatProvider { request, _, event in event(.text("m", "Veo \(request.images.count) captura")); return "" }
+        let store = AsterStore(directory: folder, startServices: false, apiFactory: { throw AsterError.message("Unused") }, chatFactory: { provider })
+        var captures = 0
+        store.screenCapture = { captures += 1; return Data("screen".utf8) }
+        XCTAssertTrue(store.sendDesktop("Hola", agentID: "study"))
+        for _ in 0..<100 where store.busy { try await Task.sleep(for: .milliseconds(10)) }
+        XCTAssertEqual(captures, 0, "The screen is never captured unless asked")
+        XCTAssertTrue(store.sendDesktop("¿Qué es esto?", agentID: "study", screen: true))
+        for _ in 0..<100 where store.busy { try await Task.sleep(for: .milliseconds(10)) }
+        XCTAssertEqual(captures, 1); XCTAssertEqual(provider.requests.last?.images, [Data("screen".utf8)])
+        let messages = try XCTUnwrap(store.desktopMission(for: "study")?.messages)
+        XCTAssertTrue(messages[2].text.hasPrefix("¿Qué es esto?") && messages[2].text.contains("🖥"), "The transcript shows the question went with the screen")
+        XCTAssertEqual(messages.last?.text, "Veo 1 captura")
+
+        store.screenCapture = { throw AsterError.message("Permite Grabación de pantalla para Aster.") }
+        XCTAssertTrue(store.sendDesktop("¿Y esto?", agentID: "study", screen: true))
+        for _ in 0..<100 where store.busy { try await Task.sleep(for: .milliseconds(10)) }
+        let failed = try XCTUnwrap(store.desktopMission(for: "study"))
+        XCTAssertEqual(failed.status, "Fallida"); XCTAssertEqual(failed.error, "Permite Grabación de pantalla para Aster.")
+        XCTAssertEqual(provider.requests.count, 2, "Nothing is sent without the screenshot that was asked for")
+    }
+
     func testHistoryIsRecentAndBounded() {
         var messages = (1...30).map { Message(role: $0 % 2 == 0 ? "assistant" : "user", text: "Mensaje \($0)") }
         messages.append(.init(role: "assistant", text: ""))

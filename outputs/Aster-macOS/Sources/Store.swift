@@ -60,6 +60,8 @@ import Combine
     private var listenerChanges: AnyCancellable?
     /// Reads a spoken question's answer aloud; replaceable so tests never play audio.
     lazy var replySpeaker: (String, String) -> Void = { [weak self] text, agentID in self?.say(text, agentID: agentID) }
+    /// Takes the screenshot for a question about the screen; replaceable so tests never capture the screen.
+    lazy var screenCapture: () async throws -> Data = { try await ScreenSnapshot.capture() }
     let computer = ComputerController()
     lazy var remote = MacRemoteBridge(store: self)
     private let apiFactory: () throws -> AgentAPI
@@ -245,9 +247,9 @@ import Combine
         guard !isRunning(desktopMission(for: agentID)?.id) else { return }
         state.desktopChats.removeValue(forKey: agentID); save()
     }
-    @discardableResult func sendDesktop(_ text: String, agentID: String, spoken: Bool = false) -> Bool {
+    @discardableResult func sendDesktop(_ text: String, agentID: String, spoken: Bool = false, screen: Bool = false) -> Bool {
         guard state.specialists.contains(where: { $0.id == agentID }) else { return false }
-        guard run(text, missionID: desktopMission(for: agentID)?.id, specialistID: agentID, desktop: true) else { return false }
+        guard run(text, missionID: desktopMission(for: agentID)?.id, specialistID: agentID, desktop: true, screen: screen) else { return false }
         if spoken, let id = desktopMission(for: agentID)?.id { spokenTurns.insert(id) }
         return true
     }
@@ -260,7 +262,7 @@ import Combine
         listener.start(language: dictationLanguage, onUpdate: onUpdate, onFinish: onFinish)
     }
     @discardableResult func run(_ text: String, companyID: UUID? = nil, fresh: Bool = false, proactive: Bool = false,
-                               missionID: UUID? = nil, specialistID: String? = nil, desktop: Bool = false, background: Bool = false) -> Bool {
+                               missionID: UUID? = nil, specialistID: String? = nil, desktop: Bool = false, background: Bool = false, screen: Bool = false) -> Bool {
         let text = text.trimmingCharacters(in: .whitespacesAndNewlines); guard !text.isEmpty, hasCapacity else { return false }
         let requestedAgent = state.specialists.first { $0.id == specialistID } ?? agent
         let intendedMission = desktop || background ? missionID : selectedMission
@@ -277,7 +279,7 @@ import Combine
         let id = state.missions[index].id
         if desktop { state.desktopChats[requestedAgent.id] = id }
         let usedAgent = state.specialists.first { $0.id == state.missions[index].specialistID } ?? agent
-        if desktop { return runQuick(text, index: index, agent: usedAgent) }
+        if desktop { return runQuick(text, index: index, agent: usedAgent, screen: screen) }
         let configuration = AgentAPI.signature(for: usedAgent, settings: settings)
         var sessionID = state.missions[index].sessionID
         var history = ""
@@ -313,7 +315,7 @@ import Combine
         return true
     }
     /// Desktop companions answer through a ChatProvider: streamed, with Aster's local tools, and the transcript kept here.
-    private func runQuick(_ text: String, index: Int, agent: Specialist) -> Bool {
+    private func runQuick(_ text: String, index: Int, agent: Specialist, screen: Bool = false) -> Bool {
         let id = state.missions[index].id
         if let old = state.missions[index].sessionID {
             state.missions[index].previousSessions = (state.missions[index].previousSessions ?? []) + [old]; state.missions[index].sessionID = nil
@@ -322,14 +324,16 @@ import Combine
                                       history: QuickChat.history(state.missions[index].messages), input: inputContext(text: text, company: nil, attachments: [], agentID: agent.id),
                                       tools: AgentAPI.functionTools(settings: settings), webSearch: settings.webSearch)
         state.missions[index].engine = "direct"; state.missions[index].attachmentNames = state.missions[index].attachmentNames ?? []
-        state.missions[index].messages.append(.init(role: "user", text: text))
+        state.missions[index].messages.append(.init(role: "user", text: text + (screen ? "\n\n🖥 " + L("Con tu pantalla") : "")))
         state.missions[index].messages.append(.init(role: "assistant", text: ""))
         state.missions[index].status = "Trabajando"; state.missions[index].error = nil; state.missions[index].turnID = nil
         state.missions[index].updated = Date(); state.missions[index].started = Date(); state.missions[index].elapsedSeconds = nil
-        startWork(id); setActivity("Pensando", for: id); save()
+        startWork(id); setActivity(screen ? "Mirando tu pantalla" : "Pensando", for: id); save()
         runtimes[id]?.task = Task { [weak self] in
             guard let self else { return }
             do {
+                var request = request
+                if screen { request.images = [try await screenCapture()]; setActivity("Pensando", for: id) }
                 let provider = try chatFactory()
                 _ = try await provider.respond(request, toolHandler: { [weak self] call in
                     guard let self else { throw CancellationError() }
