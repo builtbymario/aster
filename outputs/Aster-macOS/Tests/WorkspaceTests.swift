@@ -32,7 +32,9 @@ final class WorkspaceTests: XCTestCase {
         let persisted = try reloaded.performTool("session-local", call: call, missionID: mid)
         check(persisted == result, "Tool receipt must survive app restart")
         check(reloaded.state.tasks.count == 1, "Restart preserves the same local task")
-        let sources = try store.performTool("session-local", call: .init(turnID: "turn-local", callID: "call-sources", name: "aster_workspace", arguments: ["query": "sources"]), missionID: mid)
+        // Reading source summaries exposes a conversation to outside content, so it uses its own.
+        let reader = Mission(title: "Reader", specialistID: "director"); store.state.missions.append(reader)
+        let sources = try store.performTool("session-local", call: .init(turnID: "turn-local", callID: "call-sources", name: "aster_workspace", arguments: ["query": "sources"]), missionID: reader.id)
         check(sources.contains("false") && sources.contains("[]"), "Private sources must not be returned without opt-in")
         do { _ = try store.performTool("session-local", call: .init(turnID: "turn-local", callID: "call-memory", name: "aster_remember", arguments: ["text": "Una preferencia"]), missionID: mid); XCTFail("Memory mutation must require opt-in") } catch {}
         var settings = store.settings; settings.automaticMemory = true; store.settings = settings

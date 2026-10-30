@@ -12,6 +12,8 @@ struct ActionTarget: Equatable {
     var bundleID: String?
     /// The focused field is a password field.
     var secureField = false
+    /// The focused element takes text (a form field, a search box or the address bar).
+    var focusedEditable = false
 }
 
 enum ActionReview: Equatable {
@@ -49,6 +51,7 @@ enum ActionPolicy {
             if target.secureField { return .block(L("Aster no escribe contraseñas. Introdúcela tú.")) }
             if containsSecret(text) { return .block(L("Aster no escribe números de tarjeta, claves ni contraseñas. Introdúcelos tú.")) }
             if text.contains("\n"), messagingApps.contains(target.bundleID ?? "") { return .confirm(LF("Escribir y enviar un mensaje en %@", app)) }
+            if text.contains("\n"), browsers.contains(target.bundleID ?? ""), target.focusedEditable { return .confirm(LF("Enviar un formulario o abrir una dirección en %@", app)) }
         case "key":
             let key = (action.key ?? "").lowercased().replacingOccurrences(of: " ", with: "")
             let parts = Set(key.split(separator: "+").map { $0 == "command" ? "cmd" : $0 == "option" ? "alt" : $0 == "control" ? "ctrl" : String($0) })
@@ -63,6 +66,8 @@ enum ActionPolicy {
                 let id = target.bundleID ?? ""
                 if messagingApps.contains(id) { return .confirm(LF("Enviar un mensaje en %@", app)) }
                 if parts.contains("cmd") && browsers.contains(id) { return .confirm(LF("Enviar o publicar desde %@", app)) }
+                // Return in a web form or the address bar sends what was typed to a website.
+                if browsers.contains(id) && target.focusedEditable { return .confirm(LF("Enviar un formulario o abrir una dirección en %@", app)) }
             }
             if target.bundleID == "com.apple.mail" && parts.contains("cmd") && parts.contains("shift") && main == "d" { return .confirm(L("Enviar un correo en Mail")) }
         case "open_app":

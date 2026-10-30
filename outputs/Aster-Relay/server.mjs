@@ -5,7 +5,7 @@ import { WebSocketServer, WebSocket } from 'ws';
 
 // The relay never receives the encryption key or decodes application payloads.
 // A single process owns all rooms; run one replica until a shared router exists.
-export function createRelay({ maxRooms = 500, maxPayload = 2_000_000 } = {}) {
+export function createRelay({ maxRooms = 500, maxPayload = 2_000_000, roomsPerMinute = 10 } = {}) {
   const rooms = new Map();
   const buckets = new Map();
   const http = createServer((request, response) => {
@@ -30,7 +30,7 @@ export function createRelay({ maxRooms = 500, maxPayload = 2_000_000 } = {}) {
     const ip = request.socket.remoteAddress; // Never trust caller-supplied forwarded headers.
     const now = Date.now();
     let bucket = buckets.get(ip);
-    if (!bucket || now - bucket.start > 60_000) { bucket = { start: now, count: 0 }; buckets.set(ip, bucket); }
+    if (!bucket || now - bucket.start > 60_000) { bucket = { start: now, count: 0, rooms: 0 }; buckets.set(ip, bucket); }
     if (++bucket.count > 120 || wss.clients.size >= maxRooms * 2) return reject(socket, '429 Too Many Requests');
     const roomID = request.headers['x-aster-room'];
     const role = request.headers['x-aster-role'];
@@ -40,6 +40,8 @@ export function createRelay({ maxRooms = 500, maxPayload = 2_000_000 } = {}) {
     let room = rooms.get(roomID);
     if (room && !timingSafeEqual(hash, room.hash)) return reject(socket, '403 Forbidden');
     if (!room) {
+      // One address cannot fill the relay with rooms that lock out real pairings.
+      if (++bucket.rooms > roomsPerMinute) return reject(socket, '429 Too Many Requests');
       if (rooms.size >= maxRooms) return reject(socket, '503 Service Unavailable');
       room = { hash, touched: now, mac: null, phone: null }; rooms.set(roomID, room);
     }

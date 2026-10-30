@@ -23,6 +23,13 @@ struct MessageBlock: Identifiable {
     }
 }
 
+/// Links in answers can come from untrusted pages or emails, so only web and mail addresses open.
+enum SafeLinks {
+    static let schemes: Set<String> = ["http", "https", "mailto"]
+    static func allows(_ url: URL) -> Bool { schemes.contains(url.scheme?.lowercased() ?? "") }
+    static let action = OpenURLAction { url in allows(url) ? .systemAction : .discarded }
+}
+
 struct RichMessage: View, Equatable {
     var text: String
     var body: some View {
@@ -42,5 +49,6 @@ struct RichMessage: View, Equatable {
                 }
             }
         }.frame(maxWidth: .infinity, alignment: .leading)
+            .environment(\.openURL, SafeLinks.action)
     }
 }

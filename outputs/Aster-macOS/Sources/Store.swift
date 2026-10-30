@@ -66,6 +66,24 @@ import Combine
     /// The quick chat whose request is operating the Mac, so stopping it stops the Mac too.
     var computerOwner: UUID?
     /// Opens a Mail draft; replaceable so tests never open Mail.
+    /// Conversations that have read content Aster does not control: mail, notes, calendars, reminders,
+    /// the web or the screen. Text there could try to give Aster orders, so acting needs the user's yes.
+    var exposedConversations = Set<UUID>()
+    /// Asks the user to allow an action; replaceable so tests never show a dialog.
+    lazy var approver: (String, String) async -> Bool = { title, detail in
+        NSApp.activate(ignoringOtherApps: true)
+        let alert = NSAlert(); alert.messageText = title; alert.informativeText = detail; alert.alertStyle = .warning
+        alert.addButton(withTitle: L("Permitir")); alert.addButton(withTitle: L("No permitir"))
+        return alert.runModal() == .alertFirstButtonReturn
+    }
+    /// In a conversation that read outside content, an action runs only after the user allows it.
+    func approveIfExposed(_ conversation: UUID, action: String, detail: String) async throws {
+        guard exposedConversations.contains(conversation) else { return }
+        let message = LF("Aster quiere %@:", action) + "\n\n" + String(detail.prefix(800)) + "\n\n" + L("Esta conversación ha leído contenido externo (correo, notas, webs o tu pantalla) que podría intentar darle órdenes. Permítelo solo si se lo has pedido tú.")
+        guard await approver(L("¿Se lo has pedido tú?"), message) else {
+            throw AsterError.message("The user did not allow this action. The conversation read outside content, so Aster asks before acting; do not retry it unless the user asks again.")
+        }
+    }
     lazy var mailDrafter: ([String], [String], String, String) async throws -> Void = { try await MailDrafts.open(to: $0, cc: $1, subject: $2, body: $3) }
     /// Runs a task on the Mac for the quick chat; replaceable so tests never move the cursor.
     lazy var computerRunner: (String, Specialist, IntelligenceSettings) async -> ComputerRun? = { [weak self] task, mode, settings in await self?.computer.perform(task, agent: mode, settings: settings) }
@@ -97,6 +115,7 @@ import Combine
         file = directory.appendingPathComponent("state.json")
         do {
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            try? FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: directory.path)
             if FileManager.default.fileExists(atPath: file.path) {
                 do { state = try JSONDecoder().decode(SavedState.self, from: Data(contentsOf: file)) }
                 catch {
@@ -372,6 +391,7 @@ import Combine
             guard let self else { return }
             do {
                 var request = request
+                if screen { exposedConversations.insert(id) }
                 if screen { request.images = [try await screenCapture()]; setActivity("Pensando", for: id) }
                 let provider = try chatFactory()
                 _ = try await provider.respond(request, toolHandler: { [weak self] call in
@@ -381,6 +401,7 @@ import Combine
                     switch event {
                     case .text(let item, let delta): self?.handle(.text(item, delta, false), id: id)
                     case .activity(let message): self?.setActivity(message, for: id)
+                    case .external: self?.exposedConversations.insert(id)
                     }
                 })
                 flush(id); applyMarkup(to: id); setStatus(id, "Completada"); connectionStatus = "Conectado a OpenAI"; connectionReady = true
@@ -426,7 +447,7 @@ import Combine
             if runtime.streamFlushTask == nil { runtime.streamFlushTask = Task { [weak self, weak runtime] in
                 do { try await Task.sleep(for: .milliseconds(70)); self?.flush(id); runtime?.streamFlushTask = nil } catch {}
             } }
-        case .activity(let message): setActivity(message, for: id)
+        case .activity(let message): setActivity(message, for: id); if message == "Investigando fuentes" { exposedConversations.insert(id) }
         case .actions: setActivity("Consultando el espacio de trabajo", for: id)
         default: flush(id)
         }
@@ -514,7 +535,7 @@ import Combine
             case "company": output = company.map { ["name": $0.name, "goal": $0.goal, "notes": $0.notes] } ?? ["workspace": "personal"]
             case "tasks": output["tasks"] = state.tasks.filter { $0.companyID == company?.id }.prefix(50).map { ["title": $0.title, "done": $0.done] as [String: Any] }
             case "memory": output["memory"] = settings.useMemory ? memoryContext(companyID: company?.id) : []
-            case "sources": output["source_summaries"] = settings.shareSources ? state.inbox.filter { $0.fingerprint.hasPrefix("mail-") || $0.fingerprint.hasPrefix("calendar-") }.prefix(30).map { ["title": $0.title, "text": $0.text] } : []; output["sharing_enabled"] = settings.shareSources
+            case "sources": exposedConversations.insert(missionID); output["source_summaries"] = settings.shareSources ? state.inbox.filter { $0.fingerprint.hasPrefix("mail-") || $0.fingerprint.hasPrefix("calendar-") }.prefix(30).map { ["title": $0.title, "text": $0.text] } : []; output["sharing_enabled"] = settings.shareSources
             default: throw AsterError.message("Consulta del espacio de trabajo no válida.")
             }
         case "aster_create_task":
@@ -525,6 +546,8 @@ import Combine
             if existing == nil { state.tasks.insert(task, at: 0) }
             output = ["task_id": task.id.uuidString, "title": task.title, "saved": true, "external_action_executed": false]
         case "aster_remember":
+            // Outside content could plant false memories; those must come from the user directly.
+            guard !exposedConversations.contains(missionID) else { throw AsterError.message("Memory is not saved from a conversation that read outside content. Ask the user to add it in Memory or say it in a new conversation.") }
             guard settings.automaticMemory, let text = call.arguments["text"] as? String, !text.contains("sk-"), !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, text.count <= 8000 else { throw AsterError.message("No se permite guardar esta memoria.") }
             if !state.memories.contains(where: { $0.text == text && $0.companyID == company?.id }) { state.memories.insert(.init(text: text, companyID: company?.id), at: 0) }
             output = ["remembered": true]

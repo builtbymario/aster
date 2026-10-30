@@ -102,6 +102,7 @@ final class MacDesktop: NSObject, DesktopBackend, SCStreamOutput, SCStreamDelega
         let system = AXUIElementCreateSystemWide()
         if let focused = attribute(system, kAXFocusedUIElementAttribute), CFGetTypeID(focused) == AXUIElementGetTypeID() {
             target.secureField = (attribute(focused as! AXUIElement, kAXSubroleAttribute) as? String ?? "").contains("Secure")
+            target.focusedEditable = ["AXTextField", "AXTextArea", "AXComboBox", "AXSearchField"].contains(attribute(focused as! AXUIElement, kAXRoleAttribute) as? String ?? "")
         }
         guard ["click", "double_click"].contains(action.action), let x = action.x, let y = action.y, let point = try? geometry.point(x: x, y: y) else { return target }
         var hit: AXUIElement?

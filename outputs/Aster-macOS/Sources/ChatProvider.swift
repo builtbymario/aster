@@ -25,6 +25,8 @@ enum ChatEvent {
     /// Incremental text of one output item.
     case text(String, String)
     case activity(String)
+    /// The model read content from outside Aster, such as web search results.
+    case external
 }
 
 protocol ChatProvider {
@@ -97,7 +99,7 @@ final class OpenAIChatProvider: ChatProvider {
                 parts[key, default: ""] += delta
                 await onEvent(.text(key, delta))
             case "response.output_item.added":
-                if item?["type"] as? String == "web_search_call" { await onEvent(.activity("Buscando en internet")) }
+                if item?["type"] as? String == "web_search_call" { await onEvent(.activity("Buscando en internet")); await onEvent(.external) }
             case "response.output_item.done":
                 guard item?["type"] as? String == "function_call", let callID = item?["call_id"] as? String, let name = item?["name"] as? String else { return }
                 let arguments = (item?["arguments"] as? String).flatMap { try? JSONSerialization.jsonObject(with: Data($0.utf8)) as? [String: Any] } ?? [:]

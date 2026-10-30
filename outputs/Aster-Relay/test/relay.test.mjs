@@ -34,3 +34,20 @@ test('pairs devices, rejects wrong credentials, isolates rooms and does not queu
     const response = await fetch(url.replace('ws:', 'http:').replace('/v1/connect', '/health')); assert.equal(response.status, 200);
   } finally { for (const ws of sockets) ws.terminate(); await relay.close(); }
 });
+
+test('one address cannot fill the relay with new rooms', async () => {
+  const relay = createRelay({ roomsPerMinute: 3 }); relay.http.listen(0, '127.0.0.1'); await once(relay.http, 'listening');
+  const url = `ws://127.0.0.1:${relay.http.address().port}/v1/connect`;
+  const sockets = [];
+  async function open(room, token) {
+    const ws = new WebSocket(url, { headers: { 'X-Aster-Room': room, 'X-Aster-Role': 'mac', Authorization: `Bearer ${token}` } }); sockets.push(ws);
+    ws.on('error', () => {}); await once(ws, 'open'); return ws;
+  }
+  try {
+    const token = randomBytes(32).toString('base64url'), first = randomUUID();
+    await open(first, token); await open(randomUUID(), token); await open(randomUUID(), token);
+    await assert.rejects(open(randomUUID(), token), /429/);
+    const phone = new WebSocket(url, { headers: { 'X-Aster-Room': first, 'X-Aster-Role': 'phone', Authorization: `Bearer ${token}` } }); sockets.push(phone);
+    phone.on('error', () => {}); await once(phone, 'open');
+  } finally { for (const ws of sockets) ws.terminate(); await relay.close(); }
+});

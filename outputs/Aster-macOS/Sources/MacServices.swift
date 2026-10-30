@@ -108,6 +108,11 @@ extension AsterStore {
     func handleTool(_ session: String, call: PendingToolCall, missionID: UUID) async throws -> String {
         if let receipt = state.toolReceipts.first(where: { $0.sessionID == session && $0.turnID == call.turnID && $0.callID == call.callID }) { return receipt.output }
         guard ["aster_mail", "aster_calendar", "aster_reminders", "aster_notify", "aster_health", "aster_computer", "aster_notes", "aster_mission"].contains(call.name) else { return try performTool(session, call: call, missionID: missionID) }
+        // Reading mail, calendars, reminders or notes brings in text written by others.
+        let operation = call.arguments["operation"] as? String ?? ""
+        if call.name == "aster_mail" && operation != "draft" || call.name == "aster_notes" && operation != "create" || ["aster_calendar", "aster_reminders"].contains(call.name) && !["create", "complete"].contains(operation) {
+            exposedConversations.insert(missionID)
+        }
         var output: [String: Any] = [:]
         switch call.name {
         case "aster_health":
@@ -191,6 +196,7 @@ extension AsterStore {
         case "aster_mission":
             let brief = (call.arguments["brief"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
             let kickoff = call.arguments["kickoff"] as? Bool == true
+            try await approveIfExposed(missionID, action: L(kickoff ? "arrancar una startup completa" : "lanzar esta misión"), detail: kickoff ? (call.arguments["company"] as? String ?? "") : brief)
             var company: Company?
             if let name = (call.arguments["company"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines), !name.isEmpty {
                 company = companies.first { $0.name.localizedCaseInsensitiveCompare(name) == .orderedSame }
@@ -218,6 +224,7 @@ extension AsterStore {
         case "aster_computer":
             guard let task = (call.arguments["task"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines), !task.isEmpty else { throw AsterError.message("Describe la tarea que hay que hacer en el Mac.") }
             guard !computer.active else { throw AsterError.message("El Mac ya está haciendo otra tarea. Espera a que termine o detenla en Ordenador.") }
+            try await approveIfExposed(missionID, action: L("hacer esta tarea en tu Mac"), detail: task)
             let mode = state.missions.first { $0.id == missionID }.flatMap { mission in state.specialists.first { $0.id == mission.specialistID } } ?? agent
             setActivity("Trabajando en tu Mac", for: missionID); computerOwner = missionID
             defer { computerOwner = nil }

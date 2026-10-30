@@ -7,6 +7,8 @@ enum PortableSetup {
     static func importPreparedKey() {
         let url = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("Aster/.key-import")
         guard FileManager.default.fileExists(atPath: url.path) else { return }
+        // Another program could plant this file; accept only a private regular file owned by this user.
+        guard let attributes = try? FileManager.default.attributesOfItem(atPath: url.path), isTrustedImport(attributes) else { return }
         do {
             if try CredentialVault.read("openai-api-key") == nil {
                 let value = try AgentAPI.keyFromFile(url.path)
@@ -14,6 +16,11 @@ enum PortableSetup {
             }
             try FileManager.default.removeItem(at: url)
         } catch { /* Keep the private migration file if Keychain is locked. */ }
+    }
+    static func isTrustedImport(_ attributes: [FileAttributeKey: Any], user: UInt32 = getuid()) -> Bool {
+        attributes[.type] as? FileAttributeType == .typeRegular
+            && (attributes[.ownerAccountID] as? NSNumber)?.uint32Value == user
+            && ((attributes[.posixPermissions] as? NSNumber)?.intValue ?? 0o777) & 0o077 == 0
     }
 }
 struct OpenAIConnectionView: View {

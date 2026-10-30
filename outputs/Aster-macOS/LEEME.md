@@ -21,6 +21,8 @@ Cuando Aster maneja tu Mac, cada clic, tecla o texto se revisa en el código ant
 
 - **Necesita tu permiso:** pulsar botones como Enviar, Responder a todos, Comprar, Pagar, Publicar, Eliminar, Mover a la papelera, Firmar, Aceptar o Permitir; Intro en apps de mensajería (Mensajes, Slack, WhatsApp, Telegram, Teams…); ⌘⇧D en Mail; ⌘Intro en navegadores; ⌘Q, ⌘⌫ y forzar salida; y cualquier paso que la propia IA marque como delicado o describa como enviar, pagar o comprar. La tarea se pausa y Ordenador muestra **Permitir este paso** o **No permitir**. Antes de ejecutar un paso aprobado, Aster comprueba que el control bajo el cursor sigue siendo el mismo.
 - **Bloqueado siempre:** escribir contraseñas (campos seguros), números de tarjeta, claves de API o claves privadas; abrir Terminal, Editor de Scripts, Automator, Acceso a Llaveros, Contraseñas o Ajustes del Sistema; cerrar sesión o bloquear el Mac.
+- **Contenido externo:** si una conversación ha leído correo, notas, calendarios, recordatorios, la web o tu pantalla, ese contenido podría intentar darle órdenes a Aster. En esas conversaciones, manejar el Mac o lanzar una misión pide tu confirmación mostrando la acción exacta, y no se guardan recuerdos. En los navegadores, pulsar Intro en un formulario o en la barra de direcciones también pide permiso.
+- **Enlaces:** los enlaces de las respuestas solo abren direcciones web y de correo; nunca Atajos, archivos ni otras apps.
 - **Tareas iniciadas desde el iPhone:** como nadie está delante del Mac para confirmar, los pasos que necesitan permiso se deniegan y la IA continúa sin ellos. Continuar desde el iPhone no aprueba nada.
 
 ## En desarrollo: Aster en el notch
