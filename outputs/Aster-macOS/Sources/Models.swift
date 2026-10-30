@@ -150,6 +150,8 @@ struct Mission: Identifiable, Codable {
     var suggestions: [String]?
     /// The quick chat that started this mission; Aster returns there when it finishes.
     var parentChat: UUID?
+    /// What Aster learned about the user from the latest turn, shown so it can be undone.
+    var learned: [String]?
 }
 struct InboxNote: Identifiable, Codable {
     var id = UUID()
@@ -212,6 +214,9 @@ struct IntelligenceSettings: Codable, Equatable {
     var instructions = ""
     /// Model for the quick chat of the desktop companions; nil uses `model`.
     var quickModel: String?
+    /// Aster learns durable facts about the user from their own messages. nil is on.
+    var learnFromChats: Bool?
+    var learns: Bool { learnFromChats != false && useMemory }
     /// "openai" or "anthropic". nil is OpenAI, as before the provider could be chosen.
     var provider: String?
     /// The Claude model for everything Aster does when the provider is Anthropic.
@@ -239,6 +244,8 @@ struct MemoryEntry: Identifiable, Codable {
     var text: String
     var date = Date()
     var companyID: UUID?
+    /// Learned by Aster from what the user said, rather than written by the user.
+    var learned: Bool?
 }
 struct WorkTask: Identifiable, Codable {
     var id = UUID()

@@ -15,7 +15,8 @@ Native Swift/SwiftUI for macOS 14+, with an iPhone remote app and an end-to-end 
 - **Your day, connected.** Reads Apple Mail (and opens drafts for you to send, never sends), reads and creates calendar events, reminders and notes. Everything is read on your Mac through Apple's own apps.
 - **Missions and startups.** Longer work runs as a mission in the right mode. "I want to start a note-sharing startup for students" kicks off every department in parallel: strategy, market research with sources, product, growth, finance and legal, plus a seven-day task list. Nothing is published, hired, paid or sent.
 - **Projects.** A startup, a degree, a channel, a research question or something personal: each project has its own chat with Aster, its own team of agents (Auto picks among them), and its own goal, tasks, memory and missions. Templates bring the right team and the first useful actions, like a study plan or the startup kickoff.
-- **Memory, tasks and routines.** A memory you can read and edit, local tasks and scheduled routines.
+- **Learns about you.** Aster picks up durable facts you tell it (what you study, your goals, how you like answers), keeps them up to date and shows "Aster learned…" with an undo. It never learns from mail, notes, websites or your screen, never stores keys or card numbers, and can be switched off. Everything it knows sits in Memory, where you can edit or delete it.
+- **Tasks and routines.** Local tasks and scheduled routines.
 - **From your iPhone.** Aster Remote links to your Mac with a private QR code: chat, follow missions and, if you allow it, view and control the screen. The relay never sees your keys or your conversations.
 
 ## Bring your own AI

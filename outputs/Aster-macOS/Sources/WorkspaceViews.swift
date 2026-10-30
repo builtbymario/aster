@@ -127,12 +127,13 @@ struct MemoryView: View {
                         Spacer(); GlassAction(title: "Recordar", symbol: "plus") { store.addMemory(text, companyID: companyID); if store.notice.isEmpty { text = "" } }.disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                     }
                 }.padding(22).frostedSurface(23)
-                Text(L(store.settings.useMemory ? "La memoria se incluye en tus misiones. Los recuerdos de un proyecto solo se usan en ese proyecto." : "La memoria está desactivada. Puedes activarla en Ajustes.")).font(.system(size: 11)).foregroundStyle(.secondary).lineSpacing(4)
-                if store.state.memories.isEmpty { WorkspaceEmpty(symbol: "brain", title: "Un poco más de ti", detail: "Guarda cómo te gusta trabajar, tus objetivos o contexto útil. También puedes permitir que recuerde lo que le pidas en Ajustes.") }
+                Text(L(!store.settings.useMemory ? "La memoria está desactivada. Puedes activarla en Ajustes." : store.settings.learns ? "Aster aprende de lo que le cuentas y mantiene esta memoria al día; lo marcado como aprendido lo puedes editar o eliminar. Los recuerdos de un proyecto solo se usan en ese proyecto." : "La memoria se incluye en tus misiones. Los recuerdos de un proyecto solo se usan en ese proyecto.")).font(.system(size: 11)).foregroundStyle(.secondary).lineSpacing(4)
+                if store.state.memories.isEmpty { WorkspaceEmpty(symbol: "brain", title: "Un poco más de ti", detail: "Guarda cómo te gusta trabajar, tus objetivos o contexto útil. Aster también aprende de lo que le cuentas en vuestras conversaciones.") }
                 ForEach(store.state.memories) { entry in
                     VStack(alignment: .leading, spacing: 13) {
                         Text(entry.text).font(.system(size: 13)).lineSpacing(4).textSelection(.enabled)
                         HStack {
+                            if entry.learned == true { Label(L("Aprendido"), systemImage: "brain").font(.system(size: 10, weight: .medium)).foregroundStyle(Color.asterAccentText) }
                             Text(store.state.companies.first { $0.id == entry.companyID }?.name ?? L("Personal")).font(.system(size: 10)).foregroundStyle(.secondary)
                             Spacer(); Button(L("Editar")) { editing = entry }; Button(L("Eliminar")) { store.removeMemory(entry.id) }
                         }.font(.system(size: 11)).glassControl()

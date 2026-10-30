@@ -317,6 +317,7 @@ struct MainView: View {
                                         RichMessage(text: AsterMarkup.display(message.text)).equatable()
                                     }.padding(message.role == "user" ? 16 : 0).background(message.role == "user" ? Color.primary.opacity(0.045) : .clear, in: RoundedRectangle(cornerRadius: 16))
                                 }
+                                if !store.isRunning(mission.id), let learned = mission.learned { LearnedNote(facts: learned) { store.forgetLearned($0, in: mission.id) } }
                                 if !store.isRunning(mission.id), let steps = mission.suggestions, !steps.isEmpty {
                                     NextSteps(steps: steps, enabled: store.hasCapacity) { step in
                                         if mission.engine == "direct", store.desktopMission(for: mission.specialistID)?.id == mission.id { store.sendDesktop(step, agentID: mission.specialistID) }

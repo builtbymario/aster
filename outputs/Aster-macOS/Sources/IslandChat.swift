@@ -53,6 +53,9 @@ struct IslandChatView: View {
                 .frame(height: min(max(answerHeight, 16), Self.maximumAnswerHeight))
                 .onPreferenceChange(AnswerHeightKey.self) { answerHeight = $0 }
             }
+            if !working, let learned = mission?.learned, let id = mission?.id {
+                LearnedNote(facts: learned, tint: .white.opacity(0.45)) { store.forgetLearned($0, in: id) }
+            }
             if working {
                 HStack(spacing: 8) {
                     ThinkingDots()

@@ -89,7 +89,7 @@ final class AgentAPI: @unchecked Sendable {
         Draft and build reviewable work. External publication, mail sending, spending, contracting and legal incorporation require separate concrete authorization and a connected tool. Do not claim that Aster monitors continuously with the Mac off or that a website has been published when neither happened.
         Character personality: \(specialist.personality ?? "Warm, calm, curious and concise; be candid and useful.")
         User's additional preferences: \(settings.instructions.prefix(8000))
-        \(AsterMarkup.instructions(modes: Specialist.defaults, automatic: false))
+        \(AsterMarkup.instructions(modes: Specialist.defaults, automatic: false, learning: settings.learns))
         """
     }
     /// Aster's local function tools, shared by hosted missions and the quick chat.

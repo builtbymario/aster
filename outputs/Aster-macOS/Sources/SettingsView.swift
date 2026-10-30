@@ -69,6 +69,8 @@ struct SettingsView: View {
             }
             card("Memoria y contexto", icon: "brain") {
                 Toggle(L("Usar la memoria guardada"), isOn: option(\.useMemory)).toggleStyle(.switch)
+                Toggle(L("Aprender de mis conversaciones"), isOn: Binding(get: { store.settings.learnFromChats != false }, set: { value in var settings = store.settings; settings.learnFromChats = value; store.settings = settings })).toggleStyle(.switch).disabled(!store.settings.useMemory)
+                Text(L("Aster guarda lo que le cuentas de ti (objetivos, estudios, preferencias) y lo actualiza cuando cambia. Nunca aprende de correo, notas, webs o tu pantalla, ni guarda claves o tarjetas. Cada cosa aprendida se puede deshacer.")).font(.system(size: 11)).foregroundStyle(.secondary).lineSpacing(4)
                 Toggle(L("Recordar cuando se lo pida"), isOn: option(\.automaticMemory)).toggleStyle(.switch)
                 Text(L("Puedes ver, editar y eliminar los recuerdos en Memoria. Aster no guarda automáticamente cada conversación como un recuerdo.")).font(.system(size: 11)).foregroundStyle(.secondary).lineSpacing(4)
                 Toggle(L("Compartir resúmenes de agenda y correo con la IA"), isOn: option(\.shareSources)).toggleStyle(.switch)
