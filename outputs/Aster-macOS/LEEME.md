@@ -155,6 +155,12 @@ Las acciones se ejecutan de una en una y el resultado se revisa en la captura si
 
 Una app o documento complejo puede necesitar más de una tarea. Comprueba el resultado antes de darlo por válido o entregarlo; una tarea completada por la IA no garantiza que cualquier interfaz o hoja de cálculo se haya entendido correctamente.
 
+## Hablar con Aster
+
+Pulsa el micrófono del minichat o **⌥Espacio** desde cualquier app: se abre el chat, tus palabras aparecen mientras hablas y, tras una pausa, Aster las envía. Vuelve a pulsar para terminar antes. Si has hablado, la respuesta se lee en voz alta con la voz del compañero; si empiezas a hablar mientras Aster habla, se calla para escucharte. Lo que ya hubieras escrito en el borrador se conserva delante de lo que dictas.
+
+La primera vez macOS pide permiso para el micrófono y el reconocimiento de voz. El reconocimiento se hace en este Mac cuando el idioma lo permite; si no, macOS usa el servicio de Apple. Aster escucha el idioma de las respuestas o, en automático, el de la interfaz. En **Ajustes → Voces → Hablar con Aster** puedes desactivar ⌥Espacio (por ejemplo, si lo usas para escribir espacios irrompibles) o la respuesta hablada. El micrófono solo está activo mientras dictas.
+
 ## Voces
 
 En **Conexiones → Voces**, elige **Natural · OpenAI** o **Voces de macOS**. Las voces naturales —Marin, Cedar, Coral, Sage, Ash, Ballad, Alloy, Echo, Fable, Nova, Onyx, Shimmer y Verse— se pueden asignar a cada personaje y escuchar con el botón de prueba. Son voces generadas por IA y usan el saldo de OpenAI.

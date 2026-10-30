@@ -46,6 +46,11 @@ import AVFoundation
     private var scanning = false
     var calendar = EKEventStore()
     let voice = VoicePlayer()
+    let listener: VoiceInput
+    /// Quick chats whose question was spoken, so their answer is read aloud.
+    private var spokenTurns = Set<UUID>()
+    /// Reads a spoken question's answer aloud; replaceable so tests never play audio.
+    lazy var replySpeaker: (String, String) -> Void = { [weak self] text, agentID in self?.say(text, agentID: agentID) }
     let computer = ComputerController()
     lazy var remote = MacRemoteBridge(store: self)
     private let apiFactory: () throws -> AgentAPI
@@ -54,6 +59,7 @@ import AVFoundation
     private let file: URL
     private let writer = SnapshotWriter()
     var onFloatingChange: (() -> Void)?
+    var applyVoiceShortcut: ((Bool) -> Void)?
     var onOpenCoach: (() -> Void)?
     var agent: Specialist { state.specialists.first { $0.id == state.preferences.selectedAgent } ?? Specialist.defaults[0] }
     var mission: Mission? { state.missions.first { $0.id == selectedMission } }
@@ -64,8 +70,9 @@ import AVFoundation
     }
     var companies: [Company] { state.companies.filter { $0.archived != true } }
     var currentCompany: Company? { companies.first { $0.id == mission?.companyID } }
-    init(directory: URL? = nil, startServices: Bool = true, apiFactory: @escaping () throws -> AgentAPI = { try AgentAPI() }, chatFactory: (() throws -> ChatProvider)? = nil) {
-        self.apiFactory = apiFactory
+    init(directory: URL? = nil, startServices: Bool = true, apiFactory: @escaping () throws -> AgentAPI = { try AgentAPI() }, chatFactory: (() throws -> ChatProvider)? = nil,
+         listener: VoiceInput? = nil) {
+        self.apiFactory = apiFactory; self.listener = listener ?? VoiceInput()
         self.chatFactory = chatFactory ?? { OpenAIChatProvider(api: try apiFactory()) }
         let directory = directory ?? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("Aster")
         file = directory.appendingPathComponent("state.json")
@@ -225,9 +232,19 @@ import AVFoundation
         guard !isRunning(desktopMission(for: agentID)?.id) else { return }
         state.desktopChats.removeValue(forKey: agentID); save()
     }
-    @discardableResult func sendDesktop(_ text: String, agentID: String) -> Bool {
+    @discardableResult func sendDesktop(_ text: String, agentID: String, spoken: Bool = false) -> Bool {
         guard state.specialists.contains(where: { $0.id == agentID }) else { return false }
-        return run(text, missionID: desktopMission(for: agentID)?.id, specialistID: agentID, desktop: true)
+        guard run(text, missionID: desktopMission(for: agentID)?.id, specialistID: agentID, desktop: true) else { return false }
+        if spoken, let id = desktopMission(for: agentID)?.id { spokenTurns.insert(id) }
+        return true
+    }
+    /// The language dictation listens for: the chosen answer language, or the interface language.
+    var dictationLanguage: String { settings.responseLanguage == "auto" ? (UserDefaults.standard.string(forKey: "AsterLanguage") ?? "es") : settings.responseLanguage }
+    /// Starts listening; anything Aster is saying stops so it doesn't talk over the user.
+    func startDictation(onUpdate: @escaping (String) -> Void, onFinish: @escaping (String) -> Void) {
+        voice.stop()
+        listener.onError = { [weak self] in self?.notice = $0 }
+        listener.start(language: dictationLanguage, onUpdate: onUpdate, onFinish: onFinish)
     }
     @discardableResult func run(_ text: String, companyID: UUID? = nil, fresh: Bool = false, proactive: Bool = false,
                                missionID: UUID? = nil, specialistID: String? = nil, desktop: Bool = false, background: Bool = false) -> Bool {
@@ -311,10 +328,15 @@ import AVFoundation
                     }
                 })
                 flush(id); setStatus(id, "Completada"); connectionStatus = "Conectado a OpenAI"; connectionReady = true
+                if spokenTurns.remove(id) != nil, state.preferences.speakReplies != false, !listener.active, let item = state.missions.first(where: { $0.id == id }),
+                   let answer = item.messages.last(where: { $0.role == "assistant" })?.text, !answer.isEmpty {
+                    replySpeaker(answer, item.specialistID)
+                }
             } catch {
                 if runtimes[id]?.cancelRequested == true { flush(id); setStatus(id, "Detenida") }
                 else { await failed(id, error: error, proactive: false) }
             }
+            spokenTurns.remove(id)
             finishWork(id)
         }
         return true
@@ -483,6 +505,9 @@ import AVFoundation
     }
     func speak(_ text: String, agentID: String? = nil) {
         if voice.active { voice.stop(); return }
+        say(text, agentID: agentID)
+    }
+    func say(_ text: String, agentID: String? = nil) {
         let fallback = UserDefaults.standard.string(forKey: "AsterLanguage") ?? "es"
         let language = settings.responseLanguage == "auto" ? VoiceText.language(text, fallback: fallback) : settings.responseLanguage
         voice.say(text, natural: state.preferences.voiceEngine != "system", voice: state.preferences.agentVoices?[agentID ?? agent.id] ?? state.preferences.voice ?? AsterVoice.defaultID(agentID ?? agent.id), language: language, tone: settings.tone)

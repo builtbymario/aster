@@ -5,6 +5,7 @@ import SwiftUI
     var store: AsterStore!
     var window: NSWindow!
     var companions: DesktopCompanions!
+    var voiceShortcut: VoiceShortcut!
     var computerHUD: NSPanel!
     var coach: ScreenCoach!
     var lastTarget: NSRunningApplication?
@@ -24,6 +25,11 @@ import SwiftUI
         window.isOpaque = false; window.backgroundColor = .clear; window.titlebarSeparatorStyle = .none
         window.contentView = NSHostingView(rootView: view); window.setFrameAutosaveName("AsterMain"); if !window.setFrameUsingName("AsterMain") { window.center() }
         companions = DesktopCompanions(store: store, open: { [weak self] in self?.openMain() })
+        voiceShortcut = VoiceShortcut { [weak self] in self?.companions.dictate() }
+        store.applyVoiceShortcut = { [weak self] enabled in
+            if self?.voiceShortcut.setEnabled(enabled) == false { self?.store.notice = L("No se pudo registrar ⌥Espacio. Puede que otra app lo esté usando.") }
+        }
+        store.applyVoiceShortcut?(store.state.preferences.voiceShortcut != false)
         coach = ScreenCoach(store: store)
         store.onOpenCoach = { [weak self] in self?.coach.show() }
         coach.prepareTarget = { [weak self] target in guard let self else { return }; if let target { self.lastTarget = target }; self.window.orderOut(nil); self.companions.suspend(); self.lastTarget?.activate(options: [.activateAllWindows]) }

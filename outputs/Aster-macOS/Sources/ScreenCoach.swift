@@ -62,8 +62,8 @@ private final class CoachPanel: NSPanel { override var canBecomeKey: Bool { true
         screenObserver = NotificationCenter.default.addObserver(forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main) { [weak self] _ in Task { @MainActor in self?.clearMarks(); self?.positionPanel() } }
         var eventType = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed))
         let pointer = Unmanaged.passUnretained(self).toOpaque()
-        let installed = InstallEventHandler(GetApplicationEventTarget(), { _, _, userData in
-            guard let userData else { return OSStatus(eventNotHandledErr) }
+        let installed = InstallEventHandler(GetApplicationEventTarget(), { _, event, userData in
+            guard let userData, VoiceShortcut.hotKeyID(event) == 1 else { return OSStatus(eventNotHandledErr) }
             let coach = Unmanaged<ScreenCoach>.fromOpaque(userData).takeUnretainedValue()
             Task { @MainActor in coach.requestToggle() }; return noErr
         }, 1, &eventType, pointer, &hotKeyHandler)

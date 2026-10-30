@@ -138,6 +138,7 @@ struct DesktopChatView: View {
             HStack(alignment: .bottom, spacing: 8) {
                 DesktopComposer(text: draft, placeholder: LF("Mensaje para %@…", agent.name), send: { desktop.send() }, close: { desktop.closeChat() }, editing: { desktop.pinned = true })
                     .frame(minHeight: 36, maxHeight: 48)
+                DictationButton(listener: store.listener) { desktop.dictate(agentID) }
                 if working {
                     Button { store.stop(missionID: mission?.id) } label: { Image(systemName: "stop.fill").font(.system(size: 10)).frame(width: 30, height: 30).liquidSurface(16, interactive: true) }
                         .buttonStyle(.plain).accessibilityLabel(L("Detener"))
@@ -159,6 +160,21 @@ struct DesktopChatView: View {
         case "study": return [("Entender una tarea", "Ayúdame a entender una tarea de clase y resolverla paso a paso."), ("Preparar un examen", "Ayúdame a preparar un examen. Hagamos un plan y preguntas de práctica.")]
         default: return [("Pensar una idea", "Ayúdame a desarrollar una idea y convertirla en algo concreto."), ("Mi próximo paso", "Ayúdame a decidir en qué debería centrarme ahora.")]
         }
+    }
+}
+
+/// Microphone for push-to-talk; it animates while Aster is listening.
+struct DictationButton: View {
+    @ObservedObject var listener: VoiceInput
+    var action: () -> Void
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: listener.active ? "waveform" : "mic").font(.system(size: 12, weight: .medium))
+                .symbolEffect(.variableColor.iterative, isActive: listener.phase == .listening)
+                .frame(width: 30, height: 30).liquidSurface(16, interactive: true)
+        }.buttonStyle(.plain)
+            .accessibilityLabel(L(listener.active ? "Terminar de dictar" : "Hablar"))
+            .help(L(listener.active ? "Terminar de dictar" : "Hablar · ⌥Espacio"))
     }
 }
 

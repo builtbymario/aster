@@ -106,6 +106,11 @@ struct SettingsView: View {
     }
     private var voices: some View {
         VStack(spacing: 18) {
+            card("Hablar con Aster", icon: "mic") {
+                Toggle(L("⌥Espacio para hablar desde cualquier app"), isOn: Binding(get: { store.state.preferences.voiceShortcut != false }, set: { store.state.preferences.voiceShortcut = $0; store.save(); store.applyVoiceShortcut?($0) })).toggleStyle(.switch)
+                Toggle(L("Responder en voz alta cuando hablo"), isOn: Binding(get: { store.state.preferences.speakReplies != false }, set: { store.state.preferences.speakReplies = $0; store.save() })).toggleStyle(.switch)
+                Text(L("Pulsa el micrófono o ⌥Espacio, habla y haz una pausa: Aster envía lo que has dicho. Vuelve a pulsar para terminar antes. El reconocimiento se hace en este Mac cuando el idioma lo permite; si no, macOS usa el servicio de Apple. Escucha el idioma de las respuestas o, en automático, el de la interfaz.")).font(.system(size: 11)).foregroundStyle(.secondary).lineSpacing(4)
+            }
             card("Una voz para cada compañero", icon: "waveform") {
                 Picker(L("Tipo de voz"), selection: Binding(get: { store.state.preferences.voiceEngine ?? "natural" }, set: { store.voice.stop(); store.state.preferences.voiceEngine = $0; store.save() })) { Text(L("Natural · OpenAI")).tag("natural"); Text(L("Voces de macOS")).tag("system") }
                 Text(L("Las voces naturales son generadas por IA. Leen en el idioma del texto y usan tu saldo de OpenAI. Las voces de macOS funcionan sin esa conexión.")).font(.system(size: 11)).foregroundStyle(.secondary).lineSpacing(4)

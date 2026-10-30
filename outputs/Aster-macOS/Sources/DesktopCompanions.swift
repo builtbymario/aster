@@ -237,6 +237,19 @@ import QuartzCore
         flushDrafts()
         if store.sendDesktop(text, agentID: id) { pinned = true; drafts[id] = ""; flushDrafts() }
     }
+    /// Push-to-talk: opens the companion's chat, writes the words into its draft as they are heard,
+    /// and sends them after a pause. Calling it again while listening finishes early.
+    func dictate(_ requested: String? = nil) {
+        if store.listener.active { store.listener.finish(); return }
+        let id = requested ?? activeChatID ?? store.agent.id
+        showChat(id); pinned = true
+        let typed = drafts[id] ?? "", prefix = typed.isEmpty || typed.hasSuffix(" ") || typed.hasSuffix("\n") ? typed : typed + " "
+        store.startDictation(onUpdate: { [weak self] heard in self?.setDraft(prefix + heard, agentID: id) }, onFinish: { [weak self] heard in
+            guard let self else { return }
+            setDraft(prefix + heard, agentID: id); flushDrafts()
+            if store.sendDesktop(prefix + heard, agentID: id, spoken: true) { drafts[id] = ""; flushDrafts() }
+        })
+    }
     func showChat(_ id: String, focus: Bool = false) {
         guard !suspended, store.state.specialists.contains(where: { $0.id == id }) else { return }
         hoverTask?.cancel(); closeTask?.cancel()

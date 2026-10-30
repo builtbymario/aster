@@ -86,6 +86,10 @@ struct Preferences: Codable {
     var quietEnd: Int?
     var autonomousBrief: String?
     var parallelMissions: Int?
+    /// Read the answer aloud when the question was spoken. nil means on.
+    var speakReplies: Bool?
+    /// ⌥Space starts and ends dictation from any app. nil means on.
+    var voiceShortcut: Bool?
 }
 struct IntelligenceSettings: Codable, Equatable {
     var model = "gpt-6-astra"
