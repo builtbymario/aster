@@ -1,8 +1,12 @@
 import Foundation
+import XCTest
+@testable import Aster
 
-@main struct DesktopChatTests {
-    static func check(_ condition: @autoclosure () -> Bool, _ message: String) { if !condition() { fatalError(message) } }
-    @MainActor static func main() async throws {
+final class DesktopChatTests: XCTestCase {
+    /// Independent desktop chats and drafts, restart persistence, exact-agent routing, main-window and attachment isolation, busy rejection, recovery and preserved history. No network or native input was used.
+    @MainActor func testDesktopChats() async throws { try await Self.run() }
+    static func check(_ condition: @autoclosure () -> Bool, _ message: String = "", file: StaticString = #filePath, line: UInt = #line) { XCTAssertTrue(condition(), message, file: file, line: line) }
+    @MainActor static func run() async throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent("aster-desktop-tests-" + UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: directory) }
         let failingAPI: () throws -> AgentAPI = { throw AsterError.message("Isolated connection failure") }
@@ -44,6 +48,5 @@ import Foundation
         check(reloaded.state.desktopDrafts["missing"] == nil, "Unknown agents cannot create drafts")
         let legacy = try JSONDecoder().decode(SavedState.self, from: Data("{}".utf8))
         check(legacy.desktopChats.isEmpty && legacy.desktopDrafts.isEmpty, "Older app data must migrate without losing access")
-        print("PASS: independent desktop chats and drafts, restart persistence, exact-agent routing, main-window and attachment isolation, busy rejection, recovery and preserved history. No network or native input was used.")
     }
 }

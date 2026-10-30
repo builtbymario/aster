@@ -1,8 +1,7 @@
 #!/bin/zsh
+# Encrypted iPhone ↔ Mac link tests through a real local relay (`pnpm start` in Aster-Relay).
+# Optional argument: a private env file with OPENAI_API_KEY to also run one real OpenAI task.
 set -eu
 PROJECT_DIR="${0:A:h}"
-TEST_DIR="${PROJECT_DIR:h:h}/work"
-SOURCES=( "$PROJECT_DIR"/Shared/*.swift "$PROJECT_DIR"/Sources/*.swift )
-SOURCES=( ${SOURCES:#*/App.swift} )
-xcrun swiftc -D DEBUG -swift-version 5 -parse-as-library "${SOURCES[@]}" "$PROJECT_DIR/Tests/RemoteTests.swift" -o "$TEST_DIR/aster-remote-tests" -framework SwiftUI -framework AppKit -framework EventKit -framework UserNotifications -framework AVFoundation -framework ScreenCaptureKit -framework Security -framework ServiceManagement
-"$TEST_DIR/aster-remote-tests" "$@"
+curl -fsS --max-time 2 http://127.0.0.1:8787/health >/dev/null || { echo 'Arranca primero el relay local: pnpm start en outputs/Aster-Relay.' >&2; exit 1; }
+ASTER_LIVE_ENV_FILE="${1:+${1:A}}" xcrun swift test --package-path "$PROJECT_DIR" --filter RemoteTests

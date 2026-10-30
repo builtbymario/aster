@@ -1,4 +1,6 @@
 import Foundation
+import XCTest
+@testable import Aster
 import CoreGraphics
 
 final class DesktopFixture: DesktopBackend {
@@ -27,21 +29,23 @@ final class DesktopMockProtocol: URLProtocol {
         return try JSONSerialization.jsonObject(with: data) as! [String: Any]
     }
 }
-@main struct ComputerTests {
-    static func check(_ value: @autoclosure () -> Bool, _ message: String) { if !value() { fatalError(message) } }
+final class ComputerTests: XCTestCase {
+    /// Retina/multi-display coordinates, input bounds, key validation, real vision/function protocol, fresh-screen verification, single-action guard, cancellation, step history and multilingual voice segmentation. No native input or private capture was performed.
+    @MainActor func testComputerControlLoop() async throws { try await Self.run() }
+    static func check(_ condition: @autoclosure () -> Bool, _ message: String = "", file: StaticString = #filePath, line: UInt = #line) { XCTAssertTrue(condition(), message, file: file, line: line) }
     static func response(_ id: String, action: String, extra: [String: Any] = [:], duplicated: Bool = false) throws -> [String: Any] {
         var arguments: [String: Any] = ["action": action, "explanation": "Paso \(id)", "x": NSNull(), "y": NSNull(), "text": NSNull(), "key": NSNull(), "direction": NSNull(), "amount": NSNull(), "app": NSNull(), "reason": NSNull()]; arguments.merge(extra) { _, new in new }
         let call: [String: Any] = ["type": "function_call", "name": "aster_desktop", "call_id": "call-" + id, "arguments": String(decoding: try JSONSerialization.data(withJSONObject: arguments), as: UTF8.self)]
         return ["id": id, "status": "completed", "output": duplicated ? [call, call] : [call]]
     }
     @MainActor static func wait(_ controller: ComputerController) async throws { let end = Date().addingTimeInterval(5); while controller.active && Date() < end { try await Task.sleep(for: .milliseconds(20)) }; check(!controller.active, "Fixture must finish within bounded timeout") }
-    @MainActor static func main() async throws {
+    @MainActor static func run() async throws {
         let file = FileManager.default.temporaryDirectory.appendingPathComponent("aster-desktop-key-" + UUID().uuidString); try "OPENAI_API_KEY=isolated-fixture\n".write(to: file, atomically: true, encoding: .utf8); defer { try? FileManager.default.removeItem(at: file) }
         let config = URLSessionConfiguration.ephemeral; config.protocolClasses = [DesktopMockProtocol.self]
         let api = try AgentAPI(environmentFile: file.path, baseURL: "https://aster.test/v1", transport: URLSession(configuration: config))
         let fixture = DesktopFixture(); let midpoint = try fixture.geometry.point(x: 378, y: 245.5)
         check(midpoint == CGPoint(x: -756, y: 491), "Retina and displays left of main map screenshot pixels to global points")
-        for point in [(-1.0, 20.0), (756.0, 20.0), (20.0, Double.infinity)] { do { _ = try fixture.geometry.point(x: point.0, y: point.1); fatalError("Invalid point should fail") } catch {} }
+        for point in [(-1.0, 20.0), (756.0, 20.0), (20.0, Double.infinity)] { do { _ = try fixture.geometry.point(x: point.0, y: point.1); XCTFail("Invalid point should fail") } catch {} }
         check(DesktopKeys.parse("cmd+shift+s") != nil && DesktopKeys.parse("cmd+unknown") == nil, "Only explicit supported key chords are allowed")
         var requests = 0
         DesktopMockProtocol.handler = { request in
@@ -69,6 +73,5 @@ final class DesktopMockProtocol: URLProtocol {
         let long = String(repeating: "Una frase clara. ", count: 500); let chunks = VoiceText.chunks(long)
         check(chunks.count > 1 && chunks.allSatisfy { $0.count <= 1700 } && chunks.joined(separator: " ") == long.trimmingCharacters(in: .whitespaces), "Voice segmentation preserves text and stays below API limits")
         check(VoiceText.clean("## Hola **mundo**\n```swift\nsecret code\n```\n[Fuente](https://example.com)").contains("Fuente") && !VoiceText.clean("```swift\nsecret code\n```").contains("secret"), "Spoken text omits code and reads link labels")
-        print("PASS: Retina/multi-display coordinates, input bounds, key validation, real vision/function protocol, fresh-screen verification, single-action guard, cancellation, step history and multilingual voice segmentation. No native input or private capture was performed.")
     }
 }

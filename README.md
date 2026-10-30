@@ -26,12 +26,15 @@ For the original web prototype, copy `.env.example` to a private `.env.local` an
 
 ## Build and run
 
-Mac: macOS 14+, Xcode command-line tools. From the repository root:
+Mac: the app runs on macOS 14+ and builds with Xcode 26 or later (macOS 26 SDK). `outputs/Aster-macOS` is a Swift package: the `Aster` executable compiles `Sources/` and `Shared/`, and the `AsterTests` XCTest target covers `Tests/`. From the repository root:
 
 ```sh
-zsh outputs/Aster-macOS/build.sh
-zsh outputs/Aster-macOS/test.sh
+zsh outputs/Aster-macOS/run.sh     # incremental debug build, bundled, signed and opened
+zsh outputs/Aster-macOS/test.sh    # all XCTest suites (accepts swift test arguments, e.g. --filter ComputerTests)
+zsh outputs/Aster-macOS/build.sh   # release Aster.app; ASTER_ARCHS="arm64 x86_64" for a universal build
 ```
+
+Open `outputs/Aster-macOS/Package.swift` in Xcode to edit, navigate and run the tests. Launch the app with `run.sh` rather than Xcode's Run button: only the bundle that `build.sh` assembles has the Info.plist, resources and stable signature that macOS permissions need. To debug, use Xcode → Debug → Attach to Process → Aster. Debug builds accept a local `ws://` relay; release builds require `wss://`.
 
 The development signer generates its own private local identity, excluded by `.gitignore`. Public distribution still requires your own Apple Developer ID certificate and notarization credentials. The existing [universal Mac preview installer](outputs/Aster-0.6.0-preview-universal.dmg) contains arm64 and x86_64, but has a local development signature and is not yet notarized.
 

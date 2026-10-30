@@ -2,17 +2,23 @@
 set -eu
 PROJECT_DIR="${0:A:h}"
 APP_DIR="${ASTER_APP_DIR:-${PROJECT_DIR:h}/Aster.app}"
+CONFIGURATION="${ASTER_CONFIGURATION:-release}"
 mkdir -p "$APP_DIR/Contents/MacOS" "$APP_DIR/Contents/Resources" "${PROJECT_DIR:h:h}/work"
-ICON_WORK="$(mktemp -d "${PROJECT_DIR:h:h}/work/aster-icon.XXXXXX")"
-trap 'rm -rf "$ICON_WORK"' EXIT
-xcrun swift "$PROJECT_DIR/Assets/Icon.swift" "$ICON_WORK/Aster.iconset"
-/usr/bin/iconutil -c icns "$ICON_WORK/Aster.iconset" -o "$PROJECT_DIR/Assets/Aster.icns"
-cp "$ICON_WORK/Aster.iconset/icon_512x512@2x.png" "$PROJECT_DIR/Assets/Aster.png"
+WORK="$(mktemp -d "${PROJECT_DIR:h:h}/work/aster-build.XXXXXX")"
+trap 'rm -rf "$WORK"' EXIT
+# The committed icon is regenerated only when its generator changes.
+if [[ ! -f "$PROJECT_DIR/Assets/Aster.icns" || "$PROJECT_DIR/Assets/Icon.swift" -nt "$PROJECT_DIR/Assets/Aster.icns" ]]; then
+  xcrun swift "$PROJECT_DIR/Assets/Icon.swift" "$WORK/Aster.iconset"
+  /usr/bin/iconutil -c icns "$WORK/Aster.iconset" -o "$PROJECT_DIR/Assets/Aster.icns"
+  cp "$WORK/Aster.iconset/icon_512x512@2x.png" "$PROJECT_DIR/Assets/Aster.png"
+fi
 ARCHITECTURES=(${=ASTER_ARCHS:-arm64})
 BINARIES=()
 for ARCHITECTURE in "${ARCHITECTURES[@]}"; do
-  BINARY="$ICON_WORK/Aster-$ARCHITECTURE"
-  xcrun swiftc -swift-version 5 -O -parse-as-library -target "$ARCHITECTURE-apple-macos14.0" "$PROJECT_DIR"/Shared/*.swift "$PROJECT_DIR"/Sources/*.swift -o "$BINARY" -framework AppKit -framework SwiftUI -framework EventKit -framework UserNotifications -framework AVFoundation -framework ScreenCaptureKit -framework ApplicationServices -framework Security -framework ServiceManagement
+  SWIFTPM=(xcrun swift build --package-path "$PROJECT_DIR" -c "$CONFIGURATION" --triple "$ARCHITECTURE-apple-macosx14.0" --product Aster)
+  "${SWIFTPM[@]}"
+  BINARY="$WORK/Aster-$ARCHITECTURE"
+  cp "$("${SWIFTPM[@]}" --show-bin-path)/Aster" "$BINARY"
   BINARIES+=("$BINARY")
 done
 xcrun lipo -create "${BINARIES[@]}" -output "$APP_DIR/Contents/MacOS/Aster"
@@ -26,4 +32,4 @@ if [[ -n "${ASTER_DEVELOPER_ID:-}" ]]; then
 else
   /usr/bin/python3 "$PROJECT_DIR/sign-local.py" "$APP_DIR"
 fi
-echo "Aster.app compilada en $APP_DIR"
+echo "Aster.app compilada ($CONFIGURATION) en $APP_DIR"
