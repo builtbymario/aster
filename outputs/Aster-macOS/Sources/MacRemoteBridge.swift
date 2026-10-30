@@ -109,7 +109,7 @@ import Combine
             var receipt = RemoteReceipt(id: request.id, status: "accepted", message: "Orden recibida en el Mac.")
             switch request.operation {
             case .chat:
-                guard store.connectionReady else { throw RemoteError.message("Conecta OpenAI en el Mac antes de iniciar una conversación.") }
+                guard store.connectionReady else { throw RemoteError.message("Conecta tu IA (OpenAI o Claude) en el Mac antes de iniciar una conversación.") }
                 guard let agentID = request.agentID, store.state.specialists.contains(where: { $0.id == agentID }) else { throw RemoteError.message("Ese agente ya no está disponible.") }
                 if let id = request.missionID { guard store.state.missions.contains(where: { $0.id == id && $0.specialistID == agentID }) else { throw RemoteError.message("La conversación no corresponde a ese agente.") } }
                 if let id = request.companyID { guard store.companies.contains(where: { $0.id == id }) else { throw RemoteError.message("Esa empresa ya no está disponible.") } }
@@ -121,7 +121,7 @@ import Combine
             case .startComputer:
                 try requireControl(); guard !store.computer.active else { throw RemoteError.message("El ordenador ya tiene una tarea en curso.") }
                 guard let agent = store.state.specialists.first(where: { $0.id == request.agentID }) else { throw RemoteError.message("Elige un agente.") }
-                guard store.connectionReady else { throw RemoteError.message("Conecta OpenAI en el Mac.") }
+                guard store.connectionReady else { throw RemoteError.message("Conecta tu IA (OpenAI o Claude) en el Mac.") }
                 store.computer.start(request.text!, agent: agent, settings: store.settings, remote: true)
                 guard store.computer.active else { throw RemoteError.message(store.computer.error) }; remoteComputer = true
             case .pauseComputer: store.computer.pause()

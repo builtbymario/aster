@@ -55,6 +55,9 @@ struct MainView: View {
         .background(Button(L("")) { composerFocused = true }.keyboardShortcut("l", modifiers: .command).hidden())
         .onChange(of: store.notice) { _, new in if !new.isEmpty { showNotice = true } }
         .alert("Aster", isPresented: $showNotice) { Button(L("Entendido")) { store.notice = "" } } message: { Text(L(store.notice)) }
+        .accessibilityHidden(store.onboarding)
+        .overlay { if store.onboarding { OnboardingView().transition(.opacity) } }
+        .animation(AsterMotion.spring(reduceMotion), value: store.onboarding)
     }
     /// Display name of a page; the internal identifiers stay unchanged.
     private func pageTitle(_ page: String) -> String { page == "Personajes" ? "Inicio" : page }
@@ -119,7 +122,7 @@ struct MainView: View {
                 HStack(spacing: 10) {
                     HStack(spacing: 7) {
                         Circle().fill(store.connectionReady ? Color.green : Color.orange).frame(width: 5, height: 5)
-                        Text(L(store.busy ? "Trabajando" : store.connectionStatus == "Conectado a OpenAI" ? "Conectado" : store.connectionReady ? "Clave válida" : "Conexión pendiente")).font(.system(size: 10, weight: .medium))
+                        Text(L(store.busy ? "Trabajando" : store.connectionStatus.hasPrefix("Conectado a") ? "Conectado" : store.connectionReady ? "Clave válida" : "Conexión pendiente")).font(.system(size: 10, weight: .medium))
                     }.padding(.horizontal, 13).frame(height: 34).liquidSurface(18)
                     GlassIconButton(symbol: AsterAppearance(rawValue: appearance)?.symbol ?? "circle.lefthalf.filled", title: "Apariencia") { choosingAppearance = true }
                         .popover(isPresented: $choosingAppearance, arrowEdge: .bottom) { appearancePicker }
@@ -370,7 +373,7 @@ struct MainView: View {
                                         Text(L(error)).font(.system(size: 12)).foregroundStyle(muted).textSelection(.enabled)
                                         HStack {
                                             Button(L("Recuperar estado"), action: { store.recover() }).disabled(store.isRunning(mission.id) || !store.hasCapacity || mission.sessionID == nil)
-                                            if error.contains("facturación") { Link("Revisar cuenta OpenAI", destination: URL(string: "https://platform.openai.com/settings/organization/billing/")!) }
+                                            if error.contains("facturación") || error.contains("saldo") { let provider: AIProvider = store.settings.usesClaude ? .anthropic : .openai; Link(LF("Revisar cuenta de %@", provider.name), destination: provider.billingURL) }
                                         }.font(.system(size: 11))
                                     }.padding(18).background(Color.orange.opacity(0.07), in: RoundedRectangle(cornerRadius: 12))
                                 }

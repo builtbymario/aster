@@ -59,7 +59,7 @@ struct IslandShape: Shape {
 }
 
 /// Aster in the notch. At rest it disappears into the notch; while Aster listens, thinks or
-/// speaks it widens into a live activity; hovering the notch, ⌥Space or ⌥⌘J open it into the chat.
+/// speaks it widens into a live activity; hovering the notch or ⌥Space open it into the chat.
 @MainActor final class NotchIsland: ObservableObject {
     enum Phase { case hidden, resting, open }
     @Published private(set) var phase: Phase = .hidden

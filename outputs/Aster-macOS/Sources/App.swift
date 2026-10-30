@@ -18,7 +18,12 @@ import SwiftUI
         AsterLanguage.migrateStoredChoice()
         store = AsterStore()
         _ = store.remote
-        if (try? CredentialVault.read("openai-api-key")) == nil { store.page = "Conexiones" }
+        if store.needsOnboarding { store.onboarding = true }
+        else if !(store.settings.usesClaude ? AIProvider.anthropic : .openai).hasKey { store.page = "Conexiones" }
+        #if DEBUG
+        // Lets the welcome be reviewed on a Mac that is already set up.
+        if ProcessInfo.processInfo.environment["ASTER_ONBOARDING"] == "1" { store.onboarding = true }
+        #endif
         let view = MainView(showCompanion: { [weak self] in self?.showCompanion() }).environmentObject(store)
         window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1180, height: 830), styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView], backing: .buffered, defer: false)
         window.title = "Aster"; window.titlebarAppearsTransparent = true; window.titleVisibility = .hidden

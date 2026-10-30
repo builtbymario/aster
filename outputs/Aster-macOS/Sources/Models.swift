@@ -107,6 +107,8 @@ struct InboxNote: Identifiable, Codable {
 }
 struct Preferences: Codable {
     var selectedAgent = "director"
+    /// Set once the welcome is finished; people who connected a key before it existed skip it.
+    var onboarded: Bool?
     var notifications = false
     var watchCalendar = false
     var watchMail = false
@@ -155,6 +157,27 @@ struct IntelligenceSettings: Codable, Equatable {
     var instructions = ""
     /// Model for the quick chat of the desktop companions; nil uses `model`.
     var quickModel: String?
+    /// "openai" or "anthropic". nil is OpenAI, as before the provider could be chosen.
+    var provider: String?
+    /// The Claude model for everything Aster does when the provider is Anthropic.
+    var claudeModel: String?
+    var usesClaude: Bool { provider == AIProvider.anthropic.rawValue }
+    var providerName: String { usesClaude ? "Claude" : "OpenAI" }
+    /// The model for quick conversations, and the one for missions, the Mac and the screen.
+    var chatModel: String { usesClaude ? claudeModel ?? AnthropicAPI.defaultModel : quickModel ?? model }
+    var workModel: String { usesClaude ? claudeModel ?? AnthropicAPI.defaultModel : model }
+}
+enum AIProvider: String, CaseIterable {
+    case openai, anthropic
+    var name: String { self == .anthropic ? "Claude" : "OpenAI" }
+    var keyAccount: String { self == .anthropic ? AnthropicAPI.keyAccount : "openai-api-key" }
+    var keysURL: URL { URL(string: self == .anthropic ? "https://console.anthropic.com/settings/keys" : "https://platform.openai.com/api-keys")! }
+    var billingURL: URL { URL(string: self == .anthropic ? "https://console.anthropic.com/settings/billing" : "https://platform.openai.com/settings/organization/billing/")! }
+    var hasKey: Bool { (try? CredentialVault.read(keyAccount)) != nil }
+    /// Checks a key by listing the models it can use, newest first.
+    func models(key: String) async throws -> [String] {
+        self == .anthropic ? try await AnthropicAPI(apiKey: key).availableModels() : try await AgentAPI(apiKey: key).availableModels()
+    }
 }
 struct MemoryEntry: Identifiable, Codable {
     var id = UUID()

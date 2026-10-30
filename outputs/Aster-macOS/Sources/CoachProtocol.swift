@@ -28,6 +28,9 @@ struct CoachAnswer: Codable {
         guard response["status"] as? String == "completed", let items = response["output"] as? [[String: Any]] else { throw AsterError.message("La explicación no se ha completado. Vuelve a intentarlo.") }
         let calls = items.filter { $0["type"] as? String == "function_call" }
         guard calls.count == 1, calls[0]["name"] as? String == "aster_explain_screen", let raw = calls[0]["arguments"] as? String else { throw AsterError.message("No se ha recibido una explicación para esta pantalla.") }
-        let answer = try JSONDecoder().decode(CoachAnswer.self, from: Data(raw.utf8)); try answer.validate(); return answer
+        return try decode(arguments: Data(raw.utf8))
+    }
+    static func decode(arguments: Data) throws -> CoachAnswer {
+        let answer = try JSONDecoder().decode(CoachAnswer.self, from: arguments); try answer.validate(); return answer
     }
 }

@@ -41,6 +41,8 @@ import Combine
     @Published var calendarStatus = "Sin conectar"
     @Published var mailStatus = "Sin conectar"
     @Published var connectionStatus = "Sin comprobar"
+    /// The first-run welcome covers the window until it is finished.
+    @Published var onboarding = false
     @Published var connectionReady = false
     @Published var availableModels: [String] = []
     @Published var checkingConnection = false
@@ -91,7 +93,12 @@ import Combine
     lazy var remote = MacRemoteBridge(store: self)
     private let apiFactory: () throws -> AgentAPI
     private func makeAPI() throws -> AgentAPI { try apiFactory() }
-    private let chatFactory: () throws -> ChatProvider
+    private let chatFactory: (() throws -> ChatProvider)?
+    /// The provider chosen in Settings; tests can supply their own.
+    private func makeChat(mission: Bool = false) throws -> ChatProvider {
+        if let chatFactory { return try chatFactory() }
+        return settings.usesClaude ? AnthropicChatProvider(api: try AnthropicAPI(), rounds: mission ? 16 : OpenAIChatProvider.maximumToolRounds) : OpenAIChatProvider(api: try makeAPI())
+    }
     private let file: URL
     private let writer = SnapshotWriter()
     var onFloatingChange: (() -> Void)?
@@ -110,7 +117,7 @@ import Combine
     init(directory: URL? = nil, startServices: Bool = true, apiFactory: @escaping () throws -> AgentAPI = { try AgentAPI() }, chatFactory: (() throws -> ChatProvider)? = nil,
          listener: VoiceInput? = nil) {
         self.apiFactory = apiFactory; self.listener = listener ?? VoiceInput()
-        self.chatFactory = chatFactory ?? { OpenAIChatProvider(api: try apiFactory()) }
+        self.chatFactory = chatFactory
         let directory = directory ?? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("Aster")
         file = directory.appendingPathComponent("state.json")
         do {
@@ -218,8 +225,12 @@ import Combine
         guard !checkingConnection else { return }; checkingConnection = true
         Task {
             do {
-                availableModels = try await AgentAPI().availableModels()
-                connectionReady = availableModels.contains(settings.model)
+                let provider: AIProvider = settings.usesClaude ? .anthropic : .openai
+                guard let key = try CredentialVault.read(provider.keyAccount).flatMap({ String(data: $0, encoding: .utf8) }) else {
+                    throw AsterError.message(LF("Conecta %@ en Ajustes → Conexiones para empezar.", provider.name))
+                }
+                availableModels = try await provider.models(key: key)
+                connectionReady = availableModels.contains(settings.workModel)
                 connectionStatus = connectionReady ? "Clave válida · modelo disponible" : "El modelo elegido no está disponible en esta cuenta"
             } catch { connectionReady = false; connectionStatus = error.localizedDescription }
             checkingConnection = false
@@ -228,7 +239,7 @@ import Combine
     func attachFiles() {
         guard !mainWorking else { return }
         let panel = NSOpenPanel(); panel.allowsMultipleSelection = true; panel.canChooseDirectories = false
-        panel.message = L("Los archivos que adjuntes se enviarán a OpenAI al iniciar la misión.")
+        panel.message = LF("Los archivos que adjuntes se enviarán a %@ al iniciar la misión.", settings.providerName)
         if panel.runModal() == .OK {
             for url in panel.urls {
                 do {
@@ -312,6 +323,13 @@ import Combine
         if desktop { state.desktopChats[requestedAgent.id] = id }
         let usedAgent = state.specialists.first { $0.id == state.missions[index].specialistID } ?? agent
         if desktop { return runQuick(text, index: index, agent: usedAgent, screen: screen) }
+        if settings.usesClaude {
+            // Claude has no hosted agent workspace: the mission runs here, through the chat provider.
+            let attached = background ? [] : attachments
+            if !background { attachments = []; page = "Misiones"; artifacts = [] }
+            let company = state.companies.first { $0.id == (companyID ?? state.missions[index].companyID) }
+            return runQuick(text, index: index, agent: usedAgent, mission: .init(company: company, attachments: attached, proactive: proactive))
+        }
         let configuration = AgentAPI.signature(for: usedAgent, settings: settings)
         var sessionID = state.missions[index].sessionID
         var history = ""
@@ -369,7 +387,9 @@ import Combine
         let event = "Aster event, not a message from the user: the mission «\(mission.title)» you started in \(mission.specialistID) mode \(outcome). Files: \(files.isEmpty ? "none" : files.joined(separator: ", ")).\nResult:\n\(result)\n\nTell the user in two or three sentences what is ready and where to find it (Missions in Aster), then propose the next steps."
         _ = runQuick(event, index: index, agent: mode, hidden: true)
     }
-    private func runQuick(_ text: String, index: Int, agent: Specialist, screen: Bool = false, hidden: Bool = false) -> Bool {
+    /// What a mission run through a chat provider carries beyond a quick message.
+    struct DirectMission { var company: Company?; var attachments: [Attachment]; var proactive: Bool }
+    private func runQuick(_ text: String, index: Int, agent: Specialist, screen: Bool = false, hidden: Bool = false, mission: DirectMission? = nil) -> Bool {
         let id = state.missions[index].id
         if let old = state.missions[index].sessionID {
             state.missions[index].previousSessions = (state.missions[index].previousSessions ?? []) + [old]; state.missions[index].sessionID = nil
@@ -378,11 +398,13 @@ import Combine
         // The model sees what it proposed, so "sí" or a tapped step continues that thread.
         if let steps = state.missions[index].suggestions, !steps.isEmpty, history.last?.role == "assistant" { history[history.count - 1].text += "\n[[next: " + steps.joined(separator: " | ") + "]]" }
         state.missions[index].suggestions = nil
-        let request = ChatTurnRequest(model: settings.quickModel ?? settings.model, effort: QuickChat.effort, instructions: QuickChat.instructions(for: agent, settings: settings, modes: state.specialists),
-                                      history: history, input: inputContext(text: text, company: nil, attachments: [], agentID: agent.id),
-                                      tools: QuickChat.tools(settings: settings), webSearch: settings.webSearch)
-        state.missions[index].engine = "direct"; state.missions[index].attachmentNames = state.missions[index].attachmentNames ?? []
-        if !hidden { state.missions[index].messages.append(.init(role: "user", text: text + (screen ? "\n\n🖥 " + L("Con tu pantalla") : ""))) }
+        let attached = mission?.attachments ?? []
+        let request = ChatTurnRequest(model: mission == nil ? settings.chatModel : settings.workModel, effort: mission == nil ? QuickChat.effort : settings.effort,
+                                      instructions: QuickChat.instructions(for: agent, settings: settings, modes: state.specialists, mission: mission != nil),
+                                      history: history, input: inputContext(text: text, company: mission?.company, attachments: attached, agentID: agent.id),
+                                      tools: mission == nil ? QuickChat.tools(settings: settings) : AgentAPI.functionTools(settings: settings), webSearch: settings.webSearch, attachments: attached)
+        state.missions[index].engine = "direct"; state.missions[index].attachmentNames = (state.missions[index].attachmentNames ?? []) + attached.map(\.name)
+        if !hidden { state.missions[index].messages.append(.init(role: "user", text: text + (screen ? "\n\n🖥 " + L("Con tu pantalla") : "") + (attached.isEmpty ? "" : "\n\n" + attached.map { "📎 " + $0.name }.joined(separator: "\n")))) }
         state.missions[index].messages.append(.init(role: "assistant", text: ""))
         state.missions[index].status = "Trabajando"; state.missions[index].error = nil; state.missions[index].turnID = nil
         state.missions[index].updated = Date(); state.missions[index].started = Date(); state.missions[index].elapsedSeconds = nil
@@ -393,7 +415,7 @@ import Combine
                 var request = request
                 if screen { exposedConversations.insert(id) }
                 if screen { request.images = [try await screenCapture()]; setActivity("Pensando", for: id) }
-                let provider = try chatFactory()
+                let provider = try makeChat(mission: mission != nil)
                 _ = try await provider.respond(request, toolHandler: { [weak self] call in
                     guard let self else { throw CancellationError() }
                     return try await self.handleTool("direct-" + id.uuidString, call: call, missionID: id)
@@ -404,14 +426,18 @@ import Combine
                     case .external: self?.exposedConversations.insert(id)
                     }
                 })
-                flush(id); applyMarkup(to: id); setStatus(id, "Completada"); connectionStatus = "Conectado a OpenAI"; connectionReady = true
+                flush(id); applyMarkup(to: id); setStatus(id, "Completada"); connectionStatus = "Conectado a " + settings.providerName; connectionReady = true
+                if let mission {
+                    followUp(afterMission: id)
+                    if mission.proactive, let item = state.missions.first(where: { $0.id == id }) { addNote(title: "El equipo ha preparado una propuesta", text: String((item.messages.last?.text ?? "Abre la misión para revisar el resultado.").prefix(450)), fingerprint: id.uuidString, missionID: id) }
+                }
                 if spokenTurns.remove(id) != nil, state.preferences.speakReplies != false, !listener.active, let item = state.missions.first(where: { $0.id == id }),
                    let answer = item.messages.last(where: { $0.role == "assistant" })?.text, !answer.isEmpty {
                     replySpeaker(answer, item.specialistID)
                 }
             } catch {
                 if runtimes[id]?.cancelRequested == true { flush(id); setStatus(id, "Detenida") }
-                else { await failed(id, error: error, proactive: false) }
+                else { await failed(id, error: error, proactive: mission?.proactive ?? false) }
             }
             spokenTurns.remove(id)
             finishWork(id)
@@ -466,7 +492,7 @@ import Combine
             if !result.1.isEmpty, let i = state.missions.firstIndex(where: { $0.id == id }), let last = state.missions[i].messages.lastIndex(where: { $0.role == "assistant" }) { state.missions[i].messages[last].text = result.1; runtimes[id]?.parts = [:]; runtimes[id]?.partOrder = [] }
             if result.0 != "completed" { setStatus(id, "Por recuperar", error: result.2 ?? "Comprueba el estado de la sesión antes de continuar."); return }
         } catch { setStatus(id, "Por recuperar", error: "No se ha podido verificar el resultado: " + error.localizedDescription); return }
-        applyMarkup(to: id); setStatus(id, "Completada"); connectionStatus = "Conectado a OpenAI"; connectionReady = true
+        applyMarkup(to: id); setStatus(id, "Completada"); connectionStatus = "Conectado a " + settings.providerName; connectionReady = true
         do {
             let files = try await api.artifacts(sid, turnID: item.turnID)
             if let i = state.missions.firstIndex(where: { $0.id == id }) {
@@ -591,7 +617,8 @@ import Combine
     func say(_ text: String, agentID: String? = nil) {
         let fallback = UserDefaults.standard.string(forKey: "AsterLanguage") ?? "es"
         let language = settings.responseLanguage == "auto" ? VoiceText.language(text, fallback: fallback) : settings.responseLanguage
-        voice.say(text, natural: state.preferences.voiceEngine != "system", voice: state.preferences.agentVoices?[agentID ?? agent.id] ?? state.preferences.voice ?? AsterVoice.defaultID(agentID ?? agent.id), language: language, tone: settings.tone)
+        // Natural voices are OpenAI's; with Claude alone Aster speaks with the voices of macOS.
+        voice.say(text, natural: state.preferences.voiceEngine != "system" && (!settings.usesClaude || AIProvider.openai.hasKey), voice: state.preferences.agentVoices?[agentID ?? agent.id] ?? state.preferences.voice ?? AsterVoice.defaultID(agentID ?? agent.id), language: language, tone: settings.tone)
     }
     func addNote(title: String, text: String, fingerprint: String, missionID: UUID? = nil) {
         guard !state.inbox.contains(where: { $0.fingerprint == fingerprint }) else { return }

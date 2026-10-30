@@ -96,11 +96,13 @@ private struct FrostedSurface: ViewModifier {
 /// Text buttons. The prominent variant is the single accent action of a view.
 struct AsterButtonStyle: ButtonStyle {
     var prominent = false
+    /// The single main action of a page, such as the welcome's.
+    var large = false
     @Environment(\.isEnabled) private var enabled
     func makeBody(configuration: Configuration) -> some View {
-        let shape = RoundedRectangle(cornerRadius: 8, style: .continuous)
-        configuration.label.font(.system(size: 12, weight: .medium))
-            .padding(.horizontal, 12).padding(.vertical, 6)
+        let shape = RoundedRectangle(cornerRadius: large ? 11 : 8, style: .continuous)
+        configuration.label.font(.system(size: large ? 13 : 12, weight: .medium))
+            .padding(.horizontal, large ? 20 : 12).padding(.vertical, large ? 9 : 6)
             .foregroundStyle(prominent ? Color.asterOnAccent : Color.primary)
             .background(prominent ? AnyShapeStyle(Color.asterAccent) : AnyShapeStyle(configuration.isPressed ? Color.asterRaised : Color.asterSurface), in: shape)
             .overlay(shape.strokeBorder(prominent ? Color.clear : Color.asterHairlineStrong, lineWidth: 0.5))

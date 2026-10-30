@@ -1,45 +1,72 @@
 # Aster
 
-Aster is a native macOS AI companion with animated desktop agents, business workspaces, personal tools and an iPhone remote app. This is the complete development checkpoint at version **0.6.0**, preserved on **2026-10-01**.
+**A personal AI companion that lives in your Mac's notch.** Aster talks with you, picks the right expert for each request, does the work in your apps and keeps your day connected. It runs on your own OpenAI or Claude key, with the model you choose.
 
-Development is paused at the owner's request. See [CONTINUE.md](CONTINUE.md) for verified behavior, remaining work and how to resume.
+Native Swift/SwiftUI for macOS 14+, with an iPhone remote app and an end-to-end encrypted relay. This is a development preview, not a notarized release.
 
-## Projects
+## What Aster does
 
-| Folder | Contents |
-| --- | --- |
-| `outputs/Aster-macOS` | Native Swift/SwiftUI macOS application, shared remote protocol, assets and tests. |
-| `outputs/Aster-iPhone` | Native SwiftUI iPhone remote application and Xcode project. Keep next to Aster-macOS. |
-| `outputs/Aster-Relay` | Encrypted WebSocket packet relay, local tests and Dockerfile. |
-| `outputs/aster` | Original web prototype with its build tooling and dependency lockfile. |
-| `archive/source-checkpoints` | Earlier native source snapshots, retained for development history. |
-| `archive/development-tools` | Earlier implementation and live-validation helpers; some retain original local paths. |
-| `archive/web-prototype-history.bundle` | Original web prototype Git history. |
+- **Lives in the notch.** At rest Aster blends into the MacBook notch (top center on other displays). Hover it to open a compact chat; while Aster listens, thinks or speaks the island widens into a live activity. A floating mascot is available instead.
+- **One chat, nine modes.** Auto picks the right mode for every request and switches as the conversation moves: Study, Builder, Founder, Research, Finance, Growth, Content and Personal. You can also pin a mode.
+- **Proactive.** Every answer ends with up to three next steps as buttons. Tap one, or just say "yes", and Aster does it. When a mission it started finishes, Aster comes back to the chat with what is ready.
+- **Acts on your Mac.** "Open Numbers and make a budget for this month": Aster operates your apps, shows every step and stops to ask before anything that sends, buys, deletes or publishes. Press Esc to stop it.
+- **Sees what you see.** Toggle the eye and your next question goes with a screenshot (Aster's own windows excluded). ⌥⌘K opens *By your side*, which explains your screen with drawn marks.
+- **Talks.** Press ⌥Space anywhere, speak and pause. Recognition runs on the Mac when the language allows; answers can be read aloud.
+- **Your day, connected.** Reads Apple Mail (and opens drafts for you to send, never sends), reads and creates calendar events, reminders and notes. Everything is read on your Mac through Apple's own apps.
+- **Missions and startups.** Longer work runs as a mission in the right mode. "I want to start a note-sharing startup for students" kicks off every department in parallel: strategy, market research with sources, product, growth, finance and legal, plus a seven-day task list. Nothing is published, hired, paid or sent.
+- **Companies, memory and tasks.** Keep a workspace per company, a memory you can read and edit, local tasks and scheduled routines.
+- **From your iPhone.** Aster Remote links to your Mac with a private QR code: chat, follow missions and, if you allow it, view and control the screen. The relay never sees your keys or your conversations.
 
-## Credentials
+## Bring your own AI
 
-**No OpenAI API key is included. Each user must supply their own key.**
+No API key is included, and none ever leaves your Mac except in requests to the provider that issued it. The first launch walks you through it: choose **Claude** (Anthropic) or **OpenAI**, paste your key, pick a model from those your account can use. Keys are stored in the macOS Keychain; you can switch provider or model at any time in Settings → Connections.
 
-The native Mac app accepts a key in Settings → Connections, validates it and stores it in that user's macOS Keychain. The iPhone app does not need an OpenAI key: it links to a Mac through a private QR code. The relay does not receive the conversation encryption key or the OpenAI key.
+| | Claude | OpenAI |
+| --- | --- | --- |
+| Quick chat with Aster's tools and web search | ✓ | ✓ |
+| Operating the Mac and questions about your screen | ✓ | ✓ |
+| Missions | Run from this Mac; the deliverable is written in the answer | Hosted agent workspace that writes files and runs code |
+| Spoken answers | macOS voices (OpenAI's natural voices if an OpenAI key is also saved) | Natural voices or macOS voices |
 
-For the original web prototype, copy `.env.example` to a private `.env.local` and set your own `OPENAI_API_KEY`. It is used server-side; do not put it in a public environment variable. Native development signing material, Apple account credentials, Vercel tokens, personal app state and conversations are excluded from this repository.
+Claude is called through the Messages API (`anthropic-version: 2026-10-21`) with streaming, tool use, images and server-side web search; OpenAI through the Responses and Agents APIs.
+
+## Built to be safe
+
+Safety is enforced in code, not left to the model:
+
+- Before every click, key or text on the Mac, Aster reads the real control under the cursor with Accessibility. Send, buy, pay, delete, publish, sign, accept and similar steps pause for your permission. Passwords, card numbers and API keys are never typed; Terminal, Keychain Access and System Settings are off limits.
+- A conversation that read mail, notes, calendars, the web or your screen may contain instructions written by someone else. In those conversations, operating the Mac or starting a mission asks you first, showing the exact action, and no memories are saved.
+- Links in answers only open web and mail addresses. Tasks started from the iPhone never approve sensitive steps.
+- The iPhone link is encrypted end to end (AES-GCM, HKDF-derived keys, replay protection); the relay rate-limits new rooms.
 
 ## Build and run
 
-Mac: the app runs on macOS 14+ and builds with Xcode 26 or later (macOS 26 SDK). `outputs/Aster-macOS` is a Swift package: the `Aster` executable compiles `Sources/` and `Shared/`, and the `AsterTests` XCTest target covers `Tests/`. From the repository root:
+Requires Xcode 26 or later (macOS 26 SDK). `outputs/Aster-macOS` is a Swift package: the `Aster` executable compiles `Sources/` and `Shared/`, and `AsterTests` covers `Tests/`. From the repository root:
 
 ```sh
 zsh outputs/Aster-macOS/run.sh     # incremental debug build, bundled, signed and opened
-zsh outputs/Aster-macOS/test.sh    # all XCTest suites (accepts swift test arguments, e.g. --filter ComputerTests)
+zsh outputs/Aster-macOS/test.sh    # all XCTest suites (accepts swift test arguments, e.g. --filter ClaudeTests)
 zsh outputs/Aster-macOS/build.sh   # release Aster.app; ASTER_ARCHS="arm64 x86_64" for a universal build
 ```
 
-Open `outputs/Aster-macOS/Package.swift` in Xcode to edit, navigate and run the tests. Launch the app with `run.sh` rather than Xcode's Run button: only the bundle that `build.sh` assembles has the Info.plist, resources and stable signature that macOS permissions need. To debug, use Xcode → Debug → Attach to Process → Aster. Debug builds accept a local `ws://` relay; release builds require `wss://`.
+The tests use recorded fixtures: they need no key and spend nothing. Open `outputs/Aster-macOS/Package.swift` in Xcode to edit and run them, but launch the app with `run.sh`: only the bundle that `build.sh` assembles has the Info.plist, resources and stable signature that macOS permissions need. To debug, use Xcode → Debug → Attach to Process → Aster. Debug builds accept a local `ws://` relay; release builds require `wss://`.
 
-The development signer generates its own private local identity, excluded by `.gitignore`. Public distribution still requires your own Apple Developer ID certificate and notarization credentials. The existing [universal Mac preview installer](outputs/Aster-0.6.0-preview-universal.dmg) contains arm64 and x86_64, but has a local development signature and is not yet notarized.
+The development signer generates its own private local identity, excluded by `.gitignore`. Public distribution needs your own Apple Developer ID certificate and notarization.
 
-iPhone: open `outputs/Aster-iPhone/AsterRemote.xcodeproj`, select your own signing team and a unique bundle identifier. The generator also accepts `ASTER_APPLE_TEAM` and `ASTER_IOS_BUNDLE_ID`. Requires iOS 17+. Distribution to physical devices or TestFlight is unfinished.
+**iPhone:** open `outputs/Aster-iPhone/AsterRemote.xcodeproj` and set your own signing team and bundle identifier (or `ASTER_APPLE_TEAM` and `ASTER_IOS_BUNDLE_ID`). Requires iOS 17+.
 
-Relay: Node 24+, pnpm 11.19.0. Read [the relay guide](outputs/Aster-Relay/README.md). The included implementation is verified as one local persistent instance; it must be adapted for shared coordination before Vercel deployment.
+**Relay:** Node 24+, pnpm 11.19.0. See [the relay guide](outputs/Aster-Relay/README.md). It is verified as one persistent instance; it needs shared coordination before running on several instances.
 
-This repository is a development preview. The remote internet deployment, distribution signing, notarization, physical iPhone testing and mobile push notifications remain unfinished. Screen sharing currently uses periodic images rather than a 60 fps video stream.
+## Repository
+
+| Folder | Contents |
+| --- | --- |
+| `outputs/Aster-macOS` | The macOS app: sources, shared remote protocol, assets, localization (Spanish and English) and tests. |
+| `outputs/Aster-iPhone` | Aster Remote for iPhone (SwiftUI). Keep it next to Aster-macOS. |
+| `outputs/Aster-Relay` | Encrypted WebSocket relay, tests and Dockerfile. |
+| `outputs/aster` | The original web prototype. Copy `.env.example` to a private `.env.local` with your own key; it is used server-side only. |
+| `archive` | Earlier source checkpoints, development helpers and the web prototype's history. |
+
+## Status
+
+Working in this preview: everything above on Apple Silicon, with automated tests for the chat providers, tools, safety policy, island layout, voice input, remote protocol and relay. Still unfinished: Developer ID signing and notarization, the iPhone app on TestFlight, a public relay deployment, push notifications and a live video stream for the remote screen (it sends periodic images). Intel builds compile but have not been tested on Intel hardware. [CONTINUE.md](CONTINUE.md) keeps the handoff notes from the 0.6.0 checkpoint.

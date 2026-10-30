@@ -100,3 +100,51 @@ enum ComputerPrompt {
         ["role": "user", "content": [["type": "input_text", "text": instruction + "\nScreenshot: \(frame.geometry.imageWidth) × \(frame.geometry.imageHeight) pixels. " + frame.context], ["type": "input_image", "image_url": "data:image/jpeg;base64," + frame.jpeg.base64EncodedString(), "detail": "high"]]]
     }
 }
+
+/// Decides the next step on the Mac from a fresh screenshot and hears how the last one went.
+@MainActor protocol DesktopPlanner: AnyObject {
+    func next(_ frame: DesktopFrame, reply: String) async throws -> (call: String, action: DesktopAction)
+    func report(_ call: String, _ output: String)
+}
+
+/// OpenAI's Responses API keeps the task's history on its side; each step continues the previous response.
+@MainActor final class OpenAIDesktopPlanner: DesktopPlanner {
+    private let api: AgentAPI, settings: IntelligenceSettings, instructions: String, task: String
+    private var previous: String?
+    private var pending: [[String: Any]] = []
+    init(api: AgentAPI, settings: IntelligenceSettings, instructions: String, task: String) { self.api = api; self.settings = settings; self.instructions = instructions; self.task = task }
+    func next(_ frame: DesktopFrame, reply: String) async throws -> (call: String, action: DesktopAction) {
+        var input = pending; pending = []
+        input.append(ComputerPrompt.screenshotInput(frame, instruction: previous == nil ? "User's requested task: " + task : "This is the current screen after the last action. " + (reply.isEmpty ? "Check the result and continue the requested task." : "The user says: " + reply)))
+        var body: [String: Any] = ["model": settings.model, "instructions": instructions, "input": input, "tools": [ComputerPrompt.tool], "tool_choice": ["type": "function", "name": "aster_desktop"], "parallel_tool_calls": false, "reasoning": ["effort": settings.effort], "max_output_tokens": 2200]
+        if let previous { body["previous_response_id"] = previous }
+        let response = try await api.response(body)
+        if let issue = response["error"] as? [String: Any] { throw AsterError.message(AgentEvent.friendlyError(issue["message"] as? String ?? "La IA no pudo continuar.", code: issue["code"] as? String)) }
+        guard response["status"] as? String == "completed", let id = response["id"] as? String else { throw AsterError.message("La respuesta se interrumpió antes de completar el siguiente paso. Revisa la pantalla y vuelve a iniciar la tarea.") }
+        let calls = (response["output"] as? [[String: Any]] ?? []).filter { $0["type"] as? String == "function_call" && $0["name"] as? String == "aster_desktop" }
+        guard calls.count == 1, let callID = calls[0]["call_id"] as? String, let arguments = calls[0]["arguments"] as? String else { throw AsterError.message("La IA no devolvió una única acción válida. No se ha movido el cursor.") }
+        let action = try JSONDecoder().decode(DesktopAction.self, from: Data(arguments.utf8))
+        previous = id
+        return (callID, action)
+    }
+    func report(_ call: String, _ output: String) { pending = [["type": "function_call_output", "call_id": call, "output": output]] }
+}
+
+/// Claude decides each step from the task, a short log of the steps so far and only the latest
+/// screenshot, so long tasks stay light and no earlier screen is sent again.
+@MainActor final class ClaudeDesktopPlanner: DesktopPlanner {
+    private let api: AnthropicAPI, model: String, effort: String, instructions: String, task: String
+    private var log: [String] = []
+    init(api: AnthropicAPI, model: String, effort: String, instructions: String, task: String) { self.api = api; self.model = model; self.effort = effort; self.instructions = instructions; self.task = task }
+    func next(_ frame: DesktopFrame, reply: String) async throws -> (call: String, action: DesktopAction) {
+        var text = "User's requested task: " + task
+        if !log.isEmpty { text += "\nSteps so far, oldest first:\n" + log.suffix(40).joined(separator: "\n") + "\nThis is the current screen after the last action. " + (reply.isEmpty ? "Check the result and continue the requested task." : "") }
+        if !reply.isEmpty { text += "\nThe user says: " + reply }
+        text += "\nScreenshot: \(frame.geometry.imageWidth) × \(frame.geometry.imageHeight) pixels. " + frame.context + "\nAnswer with exactly one aster_desktop call."
+        let input = try await api.toolInput(model: model, effort: effort, system: instructions, content: [AnthropicAPI.image(frame.jpeg), ["type": "text", "text": text]], tool: ComputerPrompt.tool)
+        let action = try JSONDecoder().decode(DesktopAction.self, from: JSONSerialization.data(withJSONObject: input))
+        log.append("\(log.count + 1). \(action.action): \(action.explanation)")
+        return ("step-\(log.count)", action)
+    }
+    func report(_ call: String, _ output: String) { if !log.isEmpty { log[log.count - 1] += " → " + String(output.prefix(240)) } }
+}

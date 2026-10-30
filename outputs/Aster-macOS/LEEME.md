@@ -2,6 +2,12 @@
 
 Esta vista previa es nativa para **Apple Silicon e Intel, con macOS 14 o posterior**. Conserva tus personajes, conversaciones, empresas, memoria y preferencias de versiones anteriores. La app está firmada localmente y todavía no está notarizada para distribuirla a otros usuarios. Consulta **INSTALAR.md** antes de trasladarla a otro Mac; Intel se ha compilado, pero no probado en hardware real.
 
+## En desarrollo: tu IA, OpenAI o Claude
+
+Aster no incluye ninguna clave. Al abrirlo por primera vez, una **bienvenida** de cuatro pasos te presenta a Aster, te pide elegir con qué IA piensa (**Claude**, de Anthropic, u **OpenAI**), comprueba tu clave y te deja elegir el modelo entre los que tu cuenta puede usar; después te pregunta cómo llamarte, el idioma y si quieres Aster en el notch o como mascota flotante, y termina con los atajos y la conexión opcional de Calendario, Notas, Mail y notificaciones. La clave queda en el Llavero de tu Mac y solo se envía a quien la emitió. Puedes cambiar de IA o de modelo cuando quieras en **Ajustes → Conexiones**.
+
+Con Claude funcionan el chat, las herramientas, la búsqueda web, el control del Mac y las preguntas sobre tu pantalla. Las misiones se ejecutan desde este Mac y escriben el entregable completo en la respuesta, porque Claude no tiene aquí un espacio de agentes con archivos; con OpenAI, las misiones siguen usando ese espacio en la nube. Las voces naturales son de OpenAI: si solo usas Claude, Aster habla con las voces de macOS.
+
 ## En desarrollo: Aster actúa por ti
 
 Desde la isla, Aster ya no solo responde: **hace cosas**. Pídeselo con texto o con la voz:
@@ -27,11 +33,11 @@ Cuando Aster maneja tu Mac, cada clic, tecla o texto se revisa en el código ant
 
 ## En desarrollo: Aster en el notch
 
-Aster vive ahora en el **notch** del MacBook, como una isla dinámica. En reposo se funde con el notch y no ocupa nada. Pasa el cursor por el notch, pulsa **⌥⌘J** o **⌥Espacio** para abrirla: se despliega como una sola barra (Aster, su modo, el campo, la pantalla, la voz y enviar) y crece con un muelle solo lo que necesita la última respuesta y sus siguientes pasos. El modo se cambia tocando su etiqueta; la conversación completa se abre en la ventana principal. Mientras Aster escucha, piensa o habla, la isla se ensancha y muestra a la mascota a la izquierda y lo que hace a la derecha (ondas, puntos o una marca al terminar); mientras te escucha brilla en lavanda. Se cierra al hacer clic fuera, con Esc o con la ✕, y no se vuelve a abrir hasta que el cursor sale del notch. En pantallas sin notch aparece arriba en el centro. La isla sustituye a la mascota flotante y al compañero que seguía el cursor; la mascota flotante sigue disponible en **Ajustes → Voces → Aster en tu Mac**.
+Aster vive ahora en el **notch** del MacBook, como una isla dinámica. En reposo se funde con el notch y no ocupa nada. Pasa el cursor por el notch o pulsa **⌥Espacio** para abrirla: se despliega como una sola barra (Aster, su modo, el campo, la pantalla, la voz y enviar) y crece con un muelle solo lo que necesita la última respuesta y sus siguientes pasos. El modo se cambia tocando su etiqueta; la conversación completa se abre en la ventana principal. Mientras Aster escucha, piensa o habla, la isla se ensancha y muestra a la mascota a la izquierda y lo que hace a la derecha (ondas, puntos o una marca al terminar); mientras te escucha brilla en lavanda. Se cierra al hacer clic fuera, con Esc o con la ✕, y no se vuelve a abrir hasta que el cursor sale del notch. En pantallas sin notch aparece arriba en el centro. La isla sustituye a la mascota flotante y al compañero que seguía el cursor; la mascota flotante sigue disponible en **Ajustes → Voces → Aster en tu Mac**.
 
 ## En desarrollo: un Aster con modos
 
-Aster es ahora **un único compañero** con seis modos: **General, Study, Builder, Founder, Growth y Personal**. Cada modo conserva su propia conversación, voz y personalidad; la IA se presenta siempre como Aster en el modo elegido. En el escritorio hay un solo Aster flotante: pasa el cursor para abrir su chat rápido y cambia de modo con los chips de la parte superior. Las conversaciones y ajustes anteriores se conservan; los nombres de los antiguos personajes ya no se muestran.
+Aster es ahora **un único compañero** con modos (hoy nueve, con Auto, que elige solo). Cada modo conserva su propia conversación, voz y personalidad; la IA se presenta siempre como Aster en el modo elegido. En el escritorio hay un solo Aster: en la isla del notch o, si lo prefieres, como mascota flotante; el modo se cambia desde su etiqueta. Las conversaciones y ajustes anteriores se conservan; los nombres de los antiguos personajes ya no se muestran.
 
 La mascota es un personaje blanco con ojos oscuros y un anillo lavanda flotando debajo. El anillo muestra lo que hace: quieto en calma, con ondas mientras escucha, discontinuo y girando mientras piensa, y convertido en ondas de sonido mientras habla. La interfaz usa neutros sobrios, líneas finas, un único acento lavanda y etiquetas monoespaciadas, en modo claro y oscuro. El icono de la app y el de la barra de menús muestran la nueva mascota.
 

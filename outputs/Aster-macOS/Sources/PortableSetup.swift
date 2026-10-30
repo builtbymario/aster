@@ -23,45 +23,64 @@ enum PortableSetup {
             && ((attributes[.posixPermissions] as? NSNumber)?.intValue ?? 0o777) & 0o077 == 0
     }
 }
-struct OpenAIConnectionView: View {
+/// Where Aster's intelligence comes from: the user's own OpenAI or Claude key, kept in the Keychain.
+struct AIConnectionView: View {
     @EnvironmentObject var store: AsterStore
     @State private var key = ""
     @State private var saving = false
     @State private var message = ""
+    private var provider: AIProvider { store.settings.usesClaude ? .anthropic : .openai }
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack { Label("OpenAI", systemImage: "sparkle").font(.headline); Spacer(); Text(L(store.connectionStatus)).font(.caption).foregroundStyle(.secondary).lineLimit(2) }
-            Text("Conecta tu cuenta para que los agentes puedan pensar, hablar y trabajar. La clave queda en el Llavero de este Mac.").font(.caption).foregroundStyle(.secondary)
+            HStack { Label(L("Tu IA"), systemImage: "sparkle").font(.headline); Spacer(); Text(L(store.connectionStatus)).font(.caption).foregroundStyle(.secondary).lineLimit(2) }
+            Picker(L("Proveedor"), selection: Binding(get: { provider }, set: { store.choose($0); message = ""; key = "" })) {
+                ForEach([AIProvider.anthropic, .openai], id: \.self) { Text($0.name).tag($0) }
+            }.pickerStyle(.segmented).labelsHidden().frame(maxWidth: 260)
+            Text(LF("Aster piensa con tu propia cuenta de %@. La clave queda en el Llavero de este Mac y solo se envía a %@.", provider.name, provider == .anthropic ? "Anthropic" : "OpenAI")).font(.caption).foregroundStyle(.secondary)
             HStack {
-                SecureField("Clave de API de OpenAI", text: $key).textFieldStyle(.roundedBorder)
-                Button(saving ? "Comprobando…" : "Conectar") { connect(key) }.disabled(saving || key.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                SecureField(provider.hasKey ? L("Sustituir la clave guardada") : LF("Clave de API de %@", provider.name), text: $key).textFieldStyle(.roundedBorder)
+                Button(L(saving ? "Comprobando…" : "Conectar")) { connect(key) }.disabled(saving || key.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }
+            if store.connectionReady || !store.availableModels.isEmpty { ModelPicker() }
             HStack {
-                Button("Importar mi configuración") {
-                    let panel = NSOpenPanel(); panel.canChooseDirectories = false; panel.showsHiddenFiles = true; panel.message = "Selecciona tu archivo de configuración de OpenAI. Solo se importa la clave al Llavero."
-                    if panel.runModal() == .OK, let url = panel.url { do { connect(try AgentAPI.keyFromFile(url.path)) } catch { message = error.localizedDescription } }
-                }.disabled(saving)
-                Button("Comprobar conexión", action: store.refreshConnection).disabled(store.checkingConnection || saving)
-                Spacer(); Link("Obtener mi clave", destination: URL(string: "https://platform.openai.com/api-keys")!)
+                if provider == .openai {
+                    Button(L("Importar mi configuración")) {
+                        let panel = NSOpenPanel(); panel.canChooseDirectories = false; panel.showsHiddenFiles = true; panel.message = L("Selecciona tu archivo de configuración de OpenAI. Solo se importa la clave al Llavero.")
+                        if panel.runModal() == .OK, let url = panel.url { do { connect(try AgentAPI.keyFromFile(url.path)) } catch { message = error.localizedDescription } }
+                    }.disabled(saving)
+                }
+                Button(L("Comprobar conexión"), action: store.refreshConnection).disabled(store.checkingConnection || saving || !provider.hasKey)
+                Spacer(); Link(L("Obtener mi clave"), destination: provider.keysURL)
             }.font(.caption)
-            if !message.isEmpty { Text(message).font(.caption).textSelection(.enabled) }
-            Text("Cada Mac utiliza su propia configuración. Tu clave no se incluye en el instalador ni se envía al iPhone. Las respuestas y la voz usan el saldo de tu cuenta de OpenAI.").font(.caption2).foregroundStyle(.secondary)
+            if !message.isEmpty { Text(L(message)).font(.caption).textSelection(.enabled) }
+            Text(L(provider == .anthropic
+                   ? "Con Claude, el chat, las misiones, el control del Mac y las explicaciones de pantalla usan tu saldo de Anthropic. Las voces naturales son de OpenAI; sin esa clave, Aster habla con las voces de macOS."
+                   : "Las respuestas, las misiones y la voz natural usan el saldo de tu cuenta de OpenAI.")).font(.caption2).foregroundStyle(.secondary)
+            Text(L("Cada Mac utiliza su propia clave. No se incluye en el instalador ni se envía al iPhone.")).font(.caption2).foregroundStyle(.secondary)
         }.padding(20).background(.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 20))
     }
     private func connect(_ candidate: String) {
         guard !saving else { return }; saving = true; message = ""
         Task {
-            do {
-                let value = candidate.trimmingCharacters(in: .whitespacesAndNewlines)
-                let models = try await AgentAPI(apiKey: value).availableModels()
-                guard !models.isEmpty else { throw AsterError.message("La cuenta no devuelve ningún modelo disponible.") }
-                try CredentialVault.save(Data(value.utf8), account: "openai-api-key")
-                key = ""; message = "Conexión guardada en el Llavero."; store.refreshConnection()
-            } catch { message = error.localizedDescription }
+            do { try await store.connect(provider, key: candidate); key = ""; message = "Conexión guardada en el Llavero." }
+            catch { message = error.localizedDescription }
             saving = false
         }
     }
 }
+
+/// The model Aster thinks with, chosen from those the user's key can use.
+struct ModelPicker: View {
+    @EnvironmentObject var store: AsterStore
+    var body: some View {
+        let settings = store.settings
+        let options = AIProvider.chatModels(store.availableModels, provider: settings.usesClaude ? .anthropic : .openai, keeping: settings.workModel)
+        Picker(L("Modelo"), selection: Binding(get: { settings.workModel }, set: { store.chooseModel($0) })) {
+            ForEach(options, id: \.self) { Text(AIProvider.label($0)).tag($0) }
+        }
+    }
+}
+
 struct RemoteSettingsView: View {
     @ObservedObject var remote: MacRemoteBridge
     @State private var relay = ""
