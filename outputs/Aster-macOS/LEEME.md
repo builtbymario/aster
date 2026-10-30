@@ -2,6 +2,10 @@
 
 Esta vista previa es nativa para **Apple Silicon e Intel, con macOS 14 o posterior**. Conserva tus personajes, conversaciones, empresas, memoria y preferencias de versiones anteriores. La app está firmada localmente y todavía no está notarizada para distribuirla a otros usuarios. Consulta **INSTALAR.md** antes de trasladarla a otro Mac; Intel se ha compilado, pero no probado en hardware real.
 
+## En desarrollo: Aster en el notch
+
+Aster vive ahora en el **notch** del MacBook, como una isla dinámica. En reposo se funde con el notch y no ocupa nada. Pasa el cursor por el notch, pulsa **⌥⌘J** o **⌥Espacio** para abrirla: se despliega con un muelle y el chat aparece desde un desenfoque. Mientras Aster escucha, piensa o habla, la isla se ensancha y muestra a la mascota a la izquierda y lo que hace a la derecha (ondas, puntos o una marca al terminar); mientras te escucha brilla en lavanda. Se cierra al hacer clic fuera, con Esc o con la ✕, y no se vuelve a abrir hasta que el cursor sale del notch. En pantallas sin notch aparece arriba en el centro. La isla sustituye a la mascota flotante y al compañero que seguía el cursor; la mascota flotante sigue disponible en **Ajustes → Voces → Aster en tu Mac**.
+
 ## En desarrollo: un Aster con modos
 
 Aster es ahora **un único compañero** con seis modos: **General, Study, Builder, Founder, Growth y Personal**. Cada modo conserva su propia conversación, voz y personalidad; la IA se presenta siempre como Aster en el modo elegido. En el escritorio hay un solo Aster flotante: pasa el cursor para abrir su chat rápido y cambia de modo con los chips de la parte superior. Las conversaciones y ajustes anteriores se conservan; los nombres de los antiguos personajes ya no se muestran.

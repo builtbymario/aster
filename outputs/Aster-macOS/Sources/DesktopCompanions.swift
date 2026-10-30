@@ -10,6 +10,8 @@ import QuartzCore
     private let store: AsterStore
     private let open: () -> Void
     private var mascot: NSPanel?
+    private var island: NotchIsland?
+    var usesIsland: Bool { (store.state.preferences.desktopStyle ?? "island") == "island" }
     private var moveObserver: NSObjectProtocol?
     private var suspended = false
     private var chat: MiniChatPanel?
@@ -44,6 +46,10 @@ import QuartzCore
                width: Self.mascotSize.width, height: Self.mascotSize.height)
     }
     func synchronize() {
+        if usesIsland {
+            if island == nil { island = NotchIsland(store: store, desktop: self) }
+            return
+        }
         guard mascot == nil, let screen = NSScreen.main ?? NSScreen.screens.first else { return }
         let panel = NSPanel(contentRect: home(on: screen.visibleFrame), styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
         configure(panel, title: "Aster")
@@ -77,11 +83,12 @@ import QuartzCore
         if value { closeChat() }; restoreVisible()
     }
     func arrange() {
+        if island != nil { showAll(); return }
         guard let screen = NSScreen.main ?? NSScreen.screens.first, let mascot else { return }
         mascot.setFrame(home(on: screen.visibleFrame), display: true); savePosition()
         showAll(); if let id = activeChatID { positionChat(id) }
     }
-    func constrainToScreens() { savePosition(); if let id = activeChatID { positionChat(id) } }
+    func constrainToScreens() { island?.relayout(); savePosition(); if let id = activeChatID { positionChat(id) } }
     private func savePosition() {
         guard let mascot else { return }
         mascot.setFrame(DesktopLayout.clamped(mascot.frame, screens: NSScreen.screens.map(\.visibleFrame)), display: true); rememberPosition()
@@ -92,11 +99,13 @@ import QuartzCore
         if defaults.string(forKey: positionKey) != value { defaults.set(value, forKey: positionKey) }
     }
     private func restoreVisible(animated: Bool = true) {
-        guard !suspended, let mascot else { return }
+        guard !suspended else { return }
+        if let island { if collapsed { island.hide() } else { island.show() }; return }
+        guard let mascot else { return }
         setVisible(mascot, !collapsed, animated: animated, offset: CGPoint(x: 0, y: 10))
     }
     func suspend() {
-        suspended = true; closeChat(animated: false)
+        suspended = true; closeChat(animated: false); island?.hide()
         if let mascot { setVisible(mascot, false, animated: false) }
     }
     func resume() { suspended = false; restoreVisible() }
@@ -224,6 +233,11 @@ import QuartzCore
         hoverTask?.cancel(); closeTask?.cancel()
         if collapsed { setCollapsed(false) }
         if activeChatID != id { flushDrafts(); activeChatID = id }
+        if let island {
+            island.open()
+            if focus { pinned = true; focusInput() }
+            return
+        }
         if chat == nil {
             let panel = MiniChatPanel(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
             configure(panel, title: "Aster"); panel.hasShadow = true; panel.becomesKeyOnlyIfNeeded = true
@@ -244,23 +258,34 @@ import QuartzCore
         chat?.setFrame(DesktopLayout.chatFrame(anchor: anchor.frame, screen: screen.visibleFrame, size: Self.chatSize), display: true)
     }
     func focusInput() {
-        guard let chat else { return }; pinned = true; chat.makeKeyAndOrderFront(nil)
+        guard let target = island?.panel ?? chat else { return }; pinned = true; target.makeKeyAndOrderFront(nil)
         func editor(in view: NSView?) -> NSTextView? {
             guard let view else { return nil }; if let text = view as? NSTextView, text.isEditable { return text }
             for child in view.subviews { if let found = editor(in: child) { return found } }; return nil
         }
-        if let input = editor(in: chat.contentView) { chat.makeFirstResponder(input) }
+        if let input = editor(in: target.contentView) { target.makeFirstResponder(input) }
     }
     func restorePinnedChatFocus() -> Bool {
+        if let island { guard pinned, island.isOpen, !suspended, !collapsed else { return false }; focusInput(); return true }
         guard pinned, activeChatID != nil, chat?.isVisible == true, !suspended, !collapsed else { return false }
         focusInput(); return true
     }
     func closeChat(animated: Bool = true) {
         hoverTask?.cancel(); closeTask?.cancel(); flushDrafts()
+        if let island { island.close(); activeChatID = nil; pinned = false; chatHovered = false; return }
         guard let chat else { activeChatID = nil; pinned = false; chatHovered = false; return }
         setVisible(chat, false, animated: animated, offset: CGPoint(x: 8, y: -4)) { [weak self] in
             self?.activeChatID = nil; self?.pinned = false; self?.chatHovered = false
         }
+    }
+    /// Switches between the island in the notch and the floating mascot.
+    func setStyle(_ style: String) {
+        guard style != (store.state.preferences.desktopStyle ?? "island") else { return }
+        closeChat(animated: false)
+        store.state.preferences.desktopStyle = style
+        if style == "island" { if let mascot { setVisible(mascot, false, animated: false) } }
+        else { island?.teardown(); island = nil }
+        store.save(); synchronize(); restoreVisible()
     }
     func expandChat(_ agentID: String? = nil) {
         let id = agentID ?? currentMode

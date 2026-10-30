@@ -118,6 +118,8 @@ struct Preferences: Codable {
     var speakReplies: Bool?
     /// ⌥Space starts and ends dictation from any app. nil means on.
     var voiceShortcut: Bool?
+    /// "island" (in the notch, the default) or "floating" (a mascot on the desktop).
+    var desktopStyle: String?
 }
 struct IntelligenceSettings: Codable, Equatable {
     var model = "gpt-6-astra"

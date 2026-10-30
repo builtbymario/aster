@@ -3,6 +3,8 @@ import SwiftUI
 
 struct DesktopChatView: View {
     @ObservedObject var desktop: DesktopCompanions
+    /// The floating chat draws its own card; inside the island it sits on the island's black.
+    var chrome = true
     @EnvironmentObject var store: AsterStore
     @AppStorage("AsterAppearance") private var appearance = AsterAppearance.system.rawValue
     @AppStorage("AsterLanguage") private var language = "es"
@@ -49,10 +51,8 @@ struct DesktopChatView: View {
             }
             composer.padding(12)
         }
-        .background(Color.asterSurface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(Color.asterHairlineStrong, lineWidth: 0.5))
-        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous)).padding(1)
-        .environment(\.locale, Locale(identifier: language)).preferredColorScheme(AsterAppearance(rawValue: appearance)?.scheme)
+        .modifier(ChatChrome(enabled: chrome, scheme: AsterAppearance(rawValue: appearance)?.scheme))
+        .environment(\.locale, Locale(identifier: language))
         .onChange(of: agentID) { _, _ in following = true }
         .onExitCommand { desktop.closeChat() }
     }
@@ -168,6 +168,20 @@ struct DesktopChatView: View {
         case "study": return [("Entender una tarea", "Ayúdame a entender una tarea de clase y resolverla paso a paso."), ("Preparar un examen", "Ayúdame a preparar un examen. Hagamos un plan y preguntas de práctica.")]
         default: return [("Pensar una idea", "Ayúdame a desarrollar una idea y convertirla en algo concreto."), ("Mi próximo paso", "Ayúdame a decidir en qué debería centrarme ahora.")]
         }
+    }
+}
+
+/// The floating chat's card and appearance; the island supplies both itself.
+private struct ChatChrome: ViewModifier {
+    var enabled: Bool
+    var scheme: ColorScheme?
+    @ViewBuilder func body(content: Content) -> some View {
+        if enabled {
+            content.background(Color.asterSurface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(Color.asterHairlineStrong, lineWidth: 0.5))
+                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous)).padding(1)
+                .preferredColorScheme(scheme)
+        } else { content }
     }
 }
 

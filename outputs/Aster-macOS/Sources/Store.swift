@@ -69,6 +69,7 @@ import Combine
     private let writer = SnapshotWriter()
     var onFloatingChange: (() -> Void)?
     var applyVoiceShortcut: ((Bool) -> Void)?
+    var applyDesktopStyle: ((String) -> Void)?
     var onOpenCoach: (() -> Void)?
     var agent: Specialist { state.specialists.first { $0.id == state.preferences.selectedAgent } ?? Specialist.defaults[0] }
     var mission: Mission? { state.missions.first { $0.id == selectedMission } }

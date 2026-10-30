@@ -31,6 +31,12 @@ import SwiftUI
         }
         store.applyVoiceShortcut?(store.state.preferences.voiceShortcut != false)
         coach = ScreenCoach(store: store)
+        store.applyDesktopStyle = { [weak self] style in
+            self?.companions.setStyle(style)
+            if style == "island" { self?.coach.setFollowing(false) }
+        }
+        // The island replaces the companion that followed the cursor.
+        if companions.usesIsland { coach.setFollowing(false) }
         store.onOpenCoach = { [weak self] in self?.coach.show() }
         coach.prepareTarget = { [weak self] target in guard let self else { return }; if let target { self.lastTarget = target }; self.window.orderOut(nil); self.companions.suspend(); self.lastTarget?.activate(options: [.activateAllWindows]) }
         coach.restoreCompanions = { [weak self] in self?.companions.resume() }
