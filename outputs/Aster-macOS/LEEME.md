@@ -2,6 +2,14 @@
 
 Esta vista previa es nativa para **Apple Silicon e Intel, con macOS 14 o posterior**. Conserva tus personajes, conversaciones, empresas, memoria y preferencias de versiones anteriores. La app está firmada localmente y todavía no está notarizada para distribuirla a otros usuarios. Consulta **INSTALAR.md** antes de trasladarla a otro Mac; Intel se ha compilado, pero no probado en hardware real.
 
+## En desarrollo: seguridad de acciones
+
+Cuando Aster maneja tu Mac, cada clic, tecla o texto se revisa en el código antes de ejecutarse; no depende de que la IA se porte bien. Aster lee con Accesibilidad el control real que hay bajo el cursor y la app activa:
+
+- **Necesita tu permiso:** pulsar botones como Enviar, Responder a todos, Comprar, Pagar, Publicar, Eliminar, Mover a la papelera, Firmar, Aceptar o Permitir; Intro en apps de mensajería (Mensajes, Slack, WhatsApp, Telegram, Teams…); ⌘⇧D en Mail; ⌘Intro en navegadores; ⌘Q, ⌘⌫ y forzar salida; y cualquier paso que la propia IA marque como delicado o describa como enviar, pagar o comprar. La tarea se pausa y Ordenador muestra **Permitir este paso** o **No permitir**. Antes de ejecutar un paso aprobado, Aster comprueba que el control bajo el cursor sigue siendo el mismo.
+- **Bloqueado siempre:** escribir contraseñas (campos seguros), números de tarjeta, claves de API o claves privadas; abrir Terminal, Editor de Scripts, Automator, Acceso a Llaveros, Contraseñas o Ajustes del Sistema; cerrar sesión o bloquear el Mac.
+- **Tareas iniciadas desde el iPhone:** como nadie está delante del Mac para confirmar, los pasos que necesitan permiso se deniegan y la IA continúa sin ellos. Continuar desde el iPhone no aprueba nada.
+
 ## En desarrollo: Aster en el notch
 
 Aster vive ahora en el **notch** del MacBook, como una isla dinámica. En reposo se funde con el notch y no ocupa nada. Pasa el cursor por el notch, pulsa **⌥⌘J** o **⌥Espacio** para abrirla: se despliega con un muelle y el chat aparece desde un desenfoque. Mientras Aster escucha, piensa o habla, la isla se ensancha y muestra a la mascota a la izquierda y lo que hace a la derecha (ondas, puntos o una marca al terminar); mientras te escucha brilla en lavanda. Se cierra al hacer clic fuera, con Esc o con la ✕, y no se vuelve a abrir hasta que el cursor sale del notch. En pantallas sin notch aparece arriba en el centro. La isla sustituye a la mascota flotante y al compañero que seguía el cursor; la mascota flotante sigue disponible en **Ajustes → Voces → Aster en tu Mac**.
@@ -161,7 +169,7 @@ Durante esa tarea, las capturas y etiquetas de controles se envían a OpenAI par
 
 **Esc detiene el control.** Si usas tú el teclado, haces clic o desplazas la pantalla, Aster pausa la tarea. Puedes responder a una pregunta, hacer tú un paso pendiente y continuar. También puedes detenerlo desde el panel o la página Ordenador. El historial de pasos y el resultado se conservan en Tus últimas tareas en el Mac y en la bandeja.
 
-Las acciones se ejecutan de una en una y el resultado se revisa en la captura siguiente. Hay un límite de 60 pasos por tarea y el tiempo máximo configurado en Inteligencia. La app rechaza coordenadas fuera de pantalla y combinaciones de teclas no admitidas. Un acceso, permiso, pago, envío, contrato o borrado irreversible se deja para intervención del usuario. El motor no tiene una herramienta de terminal.
+Las acciones se ejecutan de una en una y el resultado se revisa en la captura siguiente. Hay un límite de 60 pasos por tarea y el tiempo máximo configurado en Inteligencia. La app rechaza coordenadas fuera de pantalla y combinaciones de teclas no admitidas. Aster revisa cada acción en el propio código antes de ejecutarla (ver «Seguridad de acciones»). El motor no tiene una herramienta de terminal.
 
 Una app o documento complejo puede necesitar más de una tarea. Comprueba el resultado antes de darlo por válido o entregarlo; una tarea completada por la IA no garantiza que cualquier interfaz o hoja de cálculo se haya entendido correctamente.
 

@@ -12,6 +12,11 @@ import Combine
     @Published private(set) var taskText = ""
     @Published private(set) var screenAllowed = false
     @Published private(set) var controlAllowed = false
+    /// A sensitive step waiting for the user's yes or no.
+    @Published private(set) var confirmation: PendingConfirmation?
+    /// The task was started or resumed from the iPhone: nobody is at the Mac to confirm, so sensitive steps are declined.
+    var remoteSession = false
+    private var decision: Bool?
     @Published var selectedDisplay = CGMainDisplayID()
     let preview = ScreenPreview()
     lazy var desktop = MacDesktop(preview: preview)
@@ -38,10 +43,11 @@ import Combine
         Task { do { try await desktop.start(displayID: selectedDisplay); error = "" } catch { self.error = error.localizedDescription } }
     }
     func hidePreview() { guard !active else { return }; Task { await desktop.stop() } }
-    func start(_ text: String, agent: Specialist, settings: IntelligenceSettings, api: AgentAPI? = nil, backend: DesktopBackend? = nil, needsPermissions: Bool = true) {
+    func start(_ text: String, agent: Specialist, settings: IntelligenceSettings, api: AgentAPI? = nil, backend: DesktopBackend? = nil, needsPermissions: Bool = true, remote: Bool = false) {
         let task = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !active, !task.isEmpty else { return }; refreshPermissions()
         if needsPermissions && (!screenAllowed || !controlAllowed) { error = "Activa Pantalla y Accesibilidad antes de empezar. Los botones de abajo abren esos permisos."; return }
+        remoteSession = remote; confirmation = nil; decision = nil
         active = true; paused = false; phase = "Preparando la pantalla"; steps = []; result = ""; error = ""; question = ""; taskText = task; reply = ""; runningAgentID = agent.id
         let token = UUID(); generation = token; onBegin?()
         if needsPermissions {
@@ -94,6 +100,27 @@ import Combine
                 pending = [["type": "function_call_output", "call_id": callID, "output": "The user has responded in Aster. Read the next screenshot and user reply. Do not assume that any permission or external action has been granted."]]
                 continue
             }
+            // Review the action against what is really on the Mac before anything is posted.
+            let target = backend.inspect(action, geometry: frame.geometry)
+            switch ActionPolicy.review(action, target: target) {
+            case .allow: break
+            case .block(let reason):
+                steps.append(.init(text: reason, action: "blocked"))
+                pending = [Self.output(callID, "Aster blocked this action: \(reason) Do not retry it or work around it. Leave it to the user and continue without it, or finish.")]
+                continue
+            case .confirm(let reason):
+                guard try await confirm(reason, step: action.explanation, token: token) else {
+                    steps.append(.init(text: (remoteSession ? L("Necesita confirmación en el Mac") : L("No permitido")) + " · " + reason, action: "denied"))
+                    pending = [Self.output(callID, "The user did not allow this step (\(reason)). Do not retry it or work around it. Continue without it if possible, or finish and say what is left for the user.")]
+                    continue
+                }
+                // Give the target app a moment to come back, then make sure the same control is still there.
+                try await Task.sleep(for: .milliseconds(350)); try await ready(token)
+                guard backend.inspect(action, geometry: frame.geometry).label == target.label else {
+                    pending = [Self.output(callID, "The screen changed while waiting for permission, so the action was not performed. Inspect the new screenshot before acting.")]
+                    continue
+                }
+            }
             // Announce before posting any input. Pausing during narration blocks the action.
             try await ready(token)
             do {
@@ -104,13 +131,37 @@ import Combine
         }
         error = "Se ha alcanzado el límite de 60 pasos. Revisa el resultado antes de continuar."; phase = "Necesita revisión"
     }
-    func pause() { guard active else { return }; paused = true; phase = "En pausa"; onEnd?() }
-    func resume(_ message: String = "") { guard active, paused else { return }; reply = message; question = ""; onBegin?(); paused = false; phase = "Continuando" }
+    func pause() { guard active, confirmation == nil else { return }; paused = true; phase = "En pausa"; onEnd?() }
+    func resume(_ message: String = "") { guard active, paused, confirmation == nil else { return }; reply = message; question = ""; onBegin?(); paused = false; phase = "Continuando" }
     func stop(reason: String = "Tarea detenida") {
-        guard active else { return }; job?.cancel(); deadline?.cancel(); generation = UUID(); active = false; paused = false; question = ""; phase = reason; cleanupMonitor(); onEnd?()
+        guard active else { return }; job?.cancel(); deadline?.cancel(); generation = UUID(); active = false; paused = false; question = ""; confirmation = nil; decision = nil; phase = reason; cleanupMonitor(); onEnd?()
         onFinished?(.init(task: taskText, agentID: runningAgentID, steps: steps, result: result, status: "Detenida"))
         Task { await desktop.stop() }
     }
     private func finish(agentID: String, status: String) { active = false; paused = false; question = ""; deadline?.cancel(); cleanupMonitor(); onFinished?(.init(task: taskText, agentID: agentID, steps: steps, result: result.isEmpty ? error : result, status: status)); onEnd?(); Task { await desktop.stop() } }
+    /// Pauses on a sensitive step until the user allows or declines it in Aster.
+    private func confirm(_ reason: String, step: String, token: UUID) async throws -> Bool {
+        if remoteSession { return false }
+        decision = nil; confirmation = .init(reason: reason, step: step)
+        paused = true; phase = "Necesita tu permiso"; onEnd?()
+        defer { confirmation = nil; decision = nil }
+        while decision == nil {
+            try Task.checkCancellation(); guard generation == token, active else { throw CancellationError() }
+            try await Task.sleep(for: .milliseconds(150))
+        }
+        let allowed = decision == true
+        paused = false; phase = allowed ? "Continuando" : "Sin hacer ese paso"; onBegin?()
+        return allowed
+    }
+    func approve() { if confirmation != nil { decision = true } }
+    func deny() { if confirmation != nil { decision = false } }
+    private static func output(_ callID: String, _ text: String) -> [String: Any] { ["type": "function_call_output", "call_id": callID, "output": text] }
     private func cleanupMonitor() { if let escapeMonitor { NSEvent.removeMonitor(escapeMonitor) }; escapeMonitor = nil }
+}
+
+struct PendingConfirmation: Equatable {
+    /// What Aster wants to do, in the user's words.
+    var reason: String
+    /// The model's explanation of the step.
+    var step: String
 }

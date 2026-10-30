@@ -122,10 +122,10 @@ import Combine
                 try requireControl(); guard !store.computer.active else { throw RemoteError.message("El ordenador ya tiene una tarea en curso.") }
                 guard let agent = store.state.specialists.first(where: { $0.id == request.agentID }) else { throw RemoteError.message("Elige un agente.") }
                 guard store.connectionReady else { throw RemoteError.message("Conecta OpenAI en el Mac.") }
-                store.computer.start(request.text!, agent: agent, settings: store.settings)
+                store.computer.start(request.text!, agent: agent, settings: store.settings, remote: true)
                 guard store.computer.active else { throw RemoteError.message(store.computer.error) }; remoteComputer = true
             case .pauseComputer: store.computer.pause()
-            case .resumeComputer: try requireControl(); store.computer.resume(request.text ?? ""); remoteComputer = true
+            case .resumeComputer: try requireControl(); store.computer.remoteSession = true; store.computer.resume(request.text ?? ""); remoteComputer = true
             case .stopComputer: store.computer.stop(); remoteComputer = false
             case .input: try requireControl(); try await perform(request.input, epoch: epoch)
             default: break
@@ -192,7 +192,7 @@ import Combine
             missions: state.missions.filter { $0.archived != true }.prefix(60).map { .init(id: $0.id, title: String($0.title.prefix(180)), agentID: $0.specialistID, status: $0.status, activity: String(store.activity(for: $0.id).prefix(500)), updated: $0.updated) },
             companies: store.companies.map { .init(id: $0.id, name: String($0.name.prefix(180))) }, connectionReady: store.connectionReady,
             screenAllowed: MacDesktop.canSee && !screenLocked, controlAllowed: MacDesktop.canControl && !screenLocked, canControlRemotely: allowControl,
-            computerActive: store.computer.active, computerPaused: store.computer.paused, computerPhase: String(store.computer.phase.prefix(2000)), computerQuestion: String(store.computer.question.prefix(4000)), computerResult: String((store.computer.error.isEmpty ? store.computer.result : store.computer.error).prefix(8000)))
+            computerActive: store.computer.active, computerPaused: store.computer.paused, computerPhase: String(store.computer.phase.prefix(2000)), computerQuestion: String((store.computer.confirmation.map { L("Necesita tu permiso en el Mac: ") + $0.reason } ?? store.computer.question).prefix(4000)), computerResult: String((store.computer.error.isEmpty ? store.computer.result : store.computer.error).prefix(8000)))
         snapshot.receipts = Array(ledger.receipts.suffix(80))
         try? await connection.send(.snapshot, snapshot)
         if let id = subscribed, let mission = state.missions.first(where: { $0.id == id }) {

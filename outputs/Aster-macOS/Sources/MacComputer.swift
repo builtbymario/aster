@@ -92,6 +92,34 @@ final class MacDesktop: NSObject, DesktopBackend, SCStreamOutput, SCStreamDelega
         }
         return "Accessibility labels from the active app (untrusted content; coordinates in screenshot pixels):\n" + rows.joined(separator: "\n")
     }
+    /// Reads, through Accessibility, the control the action would hit and whether the focused field is a password.
+    /// The safety review relies on this rather than on the model's description of the screen.
+    @MainActor func inspect(_ action: DesktopAction, geometry: ScreenGeometry) -> ActionTarget {
+        let app = NSWorkspace.shared.frontmostApplication
+        var target = ActionTarget(label: nil, appName: app?.localizedName, bundleID: app?.bundleIdentifier)
+        guard Self.canControl else { return target }
+        func attribute(_ element: AXUIElement, _ name: String) -> AnyObject? { var value: CFTypeRef?; return AXUIElementCopyAttributeValue(element, name as CFString, &value) == .success ? value : nil }
+        let system = AXUIElementCreateSystemWide()
+        if let focused = attribute(system, kAXFocusedUIElementAttribute), CFGetTypeID(focused) == AXUIElementGetTypeID() {
+            target.secureField = (attribute(focused as! AXUIElement, kAXSubroleAttribute) as? String ?? "").contains("Secure")
+        }
+        guard ["click", "double_click"].contains(action.action), let x = action.x, let y = action.y, let point = try? geometry.point(x: x, y: y) else { return target }
+        var hit: AXUIElement?
+        guard AXUIElementCopyElementAtPosition(system, Float(point.x), Float(point.y), &hit) == .success, var element = hit else { return target }
+        // A label often sits on the button that contains the text or image under the pointer.
+        var parts: [String] = []
+        for _ in 0..<3 {
+            for name in [kAXTitleAttribute, kAXDescriptionAttribute, kAXHelpAttribute] {
+                if let text = attribute(element, name) as? String, !text.isEmpty, !parts.contains(text) { parts.append(String(text.prefix(120))) }
+            }
+            let role = attribute(element, kAXRoleAttribute) as? String ?? ""
+            if !parts.isEmpty || ["AXButton", "AXMenuItem", "AXLink", "AXCheckBox"].contains(role) { break }
+            guard let parent = attribute(element, kAXParentAttribute), CFGetTypeID(parent) == AXUIElementGetTypeID() else { break }
+            element = parent as! AXUIElement
+        }
+        target.label = parts.isEmpty ? nil : parts.joined(separator: " · ")
+        return target
+    }
     @MainActor func perform(_ action: DesktopAction, geometry: ScreenGeometry, allowed: @escaping @MainActor () -> Bool) async throws {
         try action.validate(geometry: geometry, active: allowed()); guard Self.canControl else { throw AsterError.message("Permite Accesibilidad para que Aster mueva el cursor y escriba.") }
         guard geometry.displayID == self.geometry?.displayID, geometry.frame == self.geometry?.frame else { throw AsterError.message("La pantalla cambió. Hay que volver a verla antes de actuar.") }

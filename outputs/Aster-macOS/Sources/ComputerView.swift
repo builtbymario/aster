@@ -30,7 +30,7 @@ struct ComputerWorkspaceView: View {
                     Label(L(computer.phase), systemImage: computer.active ? computer.paused ? "pause.circle" : "cursorarrow.motionlines" : "cursorarrow").font(.system(size: 12, weight: .medium)).lineLimit(2)
                     Spacer()
                     if computer.active {
-                        GlassAction(title: computer.paused ? "Continuar" : "Pausar", symbol: computer.paused ? "play.fill" : "pause.fill") { computer.paused ? computer.resume() : computer.pause() }.disabled(!computer.question.isEmpty)
+                        GlassAction(title: computer.paused ? "Continuar" : "Pausar", symbol: computer.paused ? "play.fill" : "pause.fill") { computer.paused ? computer.resume() : computer.pause() }.disabled(!computer.question.isEmpty || computer.confirmation != nil)
                     } else {
                         Picker(L("Pantalla"), selection: $computer.selectedDisplay) { ForEach(Array(NSScreen.screens.enumerated()), id: \.offset) { index, screen in Text(screen.localizedName).tag((screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?.uint32Value ?? CGMainDisplayID()) } }.frame(maxWidth: 190).labelsHidden().onChange(of: computer.selectedDisplay) { _, _ in if computer.preview.connected { computer.showPreview() } }
                         GlassAction(title: computer.preview.connected ? "Ocultar pantalla" : "Ver pantalla", symbol: "display") { computer.preview.connected ? computer.hidePreview() : computer.showPreview() }.disabled(!computer.screenAllowed)
@@ -38,6 +38,19 @@ struct ComputerWorkspaceView: View {
                 }
                 if !computer.screenAllowed || !computer.controlAllowed { permissions }
                 if !computer.error.isEmpty { Text(L(computer.error)).font(.system(size: 12)).foregroundStyle(.secondary).lineSpacing(4).padding(16).frame(maxWidth: .infinity, alignment: .leading).frostedSurface(17) }
+                if let confirmation = computer.confirmation {
+                    VStack(alignment: .leading, spacing: 10) {
+                        HStack(spacing: 7) { Image(systemName: "hand.raised").font(.system(size: 11, weight: .semibold)).foregroundStyle(Color.asterAccent); MonoLabel(L("Necesita tu permiso"), color: .asterAccent) }
+                        Text(confirmation.reason).font(.system(size: 15, weight: .semibold)).textSelection(.enabled)
+                        Text(confirmation.step).font(.system(size: 12)).foregroundStyle(.secondary).textSelection(.enabled)
+                        HStack(spacing: 8) {
+                            Text(L("Aster no lo hará sin tu permiso. Si dudas, hazlo tú.")).font(.system(size: 10)).foregroundStyle(.secondary)
+                            Spacer()
+                            GlassAction(title: "No permitir", symbol: "xmark") { computer.deny() }
+                            GlassAction(title: "Permitir este paso", symbol: "checkmark", prominent: true) { computer.approve() }
+                        }.padding(.top, 4)
+                    }.padding(20).frostedSurface(14).overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(Color.asterAccent, lineWidth: 1))
+                }
                 if !computer.question.isEmpty {
                     VStack(alignment: .leading, spacing: 13) {
                         Text(computer.question).font(.system(size: 13, weight: .medium)).textSelection(.enabled)
