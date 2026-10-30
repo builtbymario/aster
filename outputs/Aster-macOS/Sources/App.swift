@@ -49,10 +49,10 @@ import SwiftUI
         store.computer.onBegin = { [weak self] in guard let self else { return }; self.coach.suspend(); self.window.orderOut(nil); self.companions.suspend(); self.lastTarget?.activate(options: []); self.computerHUD.orderFrontRegardless() }
         store.computer.onEnd = { [weak self] in guard let self else { return }; self.computerHUD.orderOut(nil); self.companions.resume(); self.coach.resume(); self.store.page = "Ordenador"; self.openMain() }
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
-        statusItem.button?.image = NSImage(systemSymbolName: "circle.dotted.circle.fill", accessibilityDescription: "Aster")
+        statusItem.button?.image = AsterGlyph.menuBar()
         let menu = NSMenu()
         menu.addItem(withTitle: "Abrir Aster", action: #selector(openMain), keyEquivalent: "").target = self
-        menu.addItem(withTitle: "Mostrar compañeros", action: #selector(showCompanion), keyEquivalent: "").target = self
+        menu.addItem(withTitle: "Mostrar Aster", action: #selector(showCompanion), keyEquivalent: "").target = self
         menu.addItem(withTitle: "Ordenar arriba a la derecha", action: #selector(arrangeCompanions), keyEquivalent: "").target = self
         menu.addItem(withTitle: "Minimizar compañeros", action: #selector(hideCompanions), keyEquivalent: "").target = self
         menu.addItem(withTitle: "Chat rápido", action: #selector(quickChat), keyEquivalent: "").target = self
@@ -70,13 +70,13 @@ import SwiftUI
         let windows = NSMenu(title: "Ventana"); let windowsRoot = NSMenuItem(title: "Ventana", action: nil, keyEquivalent: ""); windowsRoot.submenu = windows; mainMenu.addItem(windowsRoot)
         windows.addItem(withTitle: "Cerrar ventana", action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w")
         windows.addItem(withTitle: "Minimizar", action: #selector(NSWindow.performMiniaturize(_:)), keyEquivalent: "m")
-        windows.addItem(withTitle: "Mostrar compañeros", action: #selector(showCompanion), keyEquivalent: "").target = self
+        windows.addItem(withTitle: "Mostrar Aster", action: #selector(showCompanion), keyEquivalent: "").target = self
         windows.addItem(withTitle: "Ordenar arriba a la derecha", action: #selector(arrangeCompanions), keyEquivalent: "").target = self
         windows.addItem(withTitle: "Minimizar compañeros", action: #selector(hideCompanions), keyEquivalent: "").target = self
         let quickItem = windows.addItem(withTitle: "Chat rápido", action: #selector(quickChat), keyEquivalent: "j"); quickItem.target = self; quickItem.keyEquivalentModifierMask = [.command, .option]
         windows.addItem(withTitle: "A tu lado · ⌥⌘K", action: #selector(openCoach), keyEquivalent: "").target = self
         addChatMenu(to: windows)
-        let foldItem = windows.addItem(withTitle: "Plegar o desplegar equipo", action: #selector(toggleDesktop), keyEquivalent: "b"); foldItem.target = self; foldItem.keyEquivalentModifierMask = [.command, .option]
+        let foldItem = windows.addItem(withTitle: "Mostrar u ocultar Aster", action: #selector(toggleDesktop), keyEquivalent: "b"); foldItem.target = self; foldItem.keyEquivalentModifierMask = [.command, .option]
         windows.addItem(withTitle: "Mostrar Aster", action: #selector(openMain), keyEquivalent: "").target = self
         windows.addItem(withTitle: "Nueva misión", action: #selector(newMission), keyEquivalent: "n").target = self
         NSApplication.shared.windowsMenu = windows

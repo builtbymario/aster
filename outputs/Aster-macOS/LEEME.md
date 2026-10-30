@@ -2,6 +2,12 @@
 
 Esta vista previa es nativa para **Apple Silicon e Intel, con macOS 14 o posterior**. Conserva tus personajes, conversaciones, empresas, memoria y preferencias de versiones anteriores. La app está firmada localmente y todavía no está notarizada para distribuirla a otros usuarios. Consulta **INSTALAR.md** antes de trasladarla a otro Mac; Intel se ha compilado, pero no probado en hardware real.
 
+## En desarrollo: un Aster con modos
+
+Aster es ahora **un único compañero** con seis modos: **General, Study, Builder, Founder, Growth y Personal**. Cada modo conserva su propia conversación, voz y personalidad; la IA se presenta siempre como Aster en el modo elegido. En el escritorio hay un solo Aster flotante: pasa el cursor para abrir su chat rápido y cambia de modo con los chips de la parte superior. Las conversaciones y ajustes anteriores se conservan; los nombres de los antiguos personajes ya no se muestran.
+
+La mascota es un personaje blanco con ojos oscuros y un anillo lavanda flotando debajo. El anillo muestra lo que hace: quieto en calma, con ondas mientras escucha, discontinuo y girando mientras piensa, y convertido en ondas de sonido mientras habla. La interfaz usa neutros sobrios, líneas finas, un único acento lavanda y etiquetas monoespaciadas, en modo claro y oscuro. El icono de la app y el de la barra de menús muestran la nueva mascota.
+
 ## Novedades de 0.6
 
 La conexión de OpenAI se configura desde Ajustes → Conexiones y se guarda en el Llavero. Ya no depende de una ruta privada de este ordenador. Restaurar copia permite trasladar tu espacio desde otro Mac, con copia previa del estado actual y las rutinas importadas pausadas.

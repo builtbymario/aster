@@ -17,6 +17,34 @@ struct Specialist: Identifiable, Codable {
         .init(id: "study", name: "Atlas", role: "Aprendizaje", detail: "Aprende contigo, explica paso a paso y te ayuda con documentos, Excel y tareas en tu Mac.", style: .init(form: .orbit, tint: .pearl))
     ]
 }
+extension Specialist {
+    /// Aster is one companion; each specialist is a mode with its own conversation, voice and personality.
+    var mode: String {
+        switch id {
+        case "director": return "General"
+        case "growth": return "Growth"
+        case "builder": return "Builder"
+        case "strategy": return "Founder"
+        case "personal": return "Personal"
+        case "study": return "Study"
+        default: return role
+        }
+    }
+    var symbol: String {
+        switch id {
+        case "growth": return "chart.line.uptrend.xyaxis"
+        case "builder": return "chevron.left.forwardslash.chevron.right"
+        case "strategy": return "briefcase"
+        case "personal": return "heart"
+        case "study": return "graduationcap"
+        default: return "sparkle"
+        }
+    }
+    /// "Aster · Builder", or "Aster" for the general mode.
+    var title: String { id == "director" ? "Aster" : "Aster · " + mode }
+    /// Modes in the order the interface shows them.
+    static let modeOrder = ["director", "study", "builder", "strategy", "growth", "personal"]
+}
 struct Company: Identifiable, Codable {
     var id = UUID()
     var name: String

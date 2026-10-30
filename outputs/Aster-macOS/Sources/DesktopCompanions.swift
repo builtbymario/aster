@@ -2,14 +2,16 @@ import AppKit
 import SwiftUI
 import QuartzCore
 
+/// Aster on the desktop: one floating companion and its quick chat. Each mode keeps its own
+/// conversation and draft; switching mode in the chat switches conversation.
 @MainActor final class DesktopCompanions: ObservableObject {
+    static let mascotSize = CGSize(width: 88, height: 88)
+    static let chatSize = CGSize(width: 372, height: 460)
     private let store: AsterStore
     private let open: () -> Void
-    private var panels: [String: NSPanel] = [:]
-    private var moveObservers: [String: NSObjectProtocol] = [:]
-    private var hidden: Set<String>
+    private var mascot: NSPanel?
+    private var moveObserver: NSObjectProtocol?
     private var suspended = false
-    private var fold: NSPanel?
     private var chat: MiniChatPanel?
     private var hoverTask: Task<Void, Never>?
     private var closeTask: Task<Void, Never>?
@@ -17,127 +19,89 @@ import QuartzCore
     private var visibilityTasks: [ObjectIdentifier: Task<Void, Never>] = [:]
     private var visibilityRevisions: [ObjectIdentifier: Int] = [:]
     private var visibilityTargets: [ObjectIdentifier: Bool] = [:]
-    private var hoveredAgent: String?
+    private var hoveringMascot = false
     private var chatHovered = false
-    private var dragging = Set<String>()
+    private var dragging = false
     private let defaults = UserDefaults.standard
-    private let hiddenKey = "AsterDesktopHiddenAgents"
+    private let positionKey = "AsterDesktopPosition.v3"
+    /// Aster is hidden from the desktop.
     @Published private(set) var collapsed: Bool
     @Published private(set) var activeChatID: String?
     @Published var pinned = false
     @Published private(set) var drafts: [String: String]
-    private func positionKey(_ id: String) -> String { "AsterDesktopPosition.v2.\(id)" }
-    var visibleCount: Int { store.state.specialists.filter { !hidden.contains($0.id) }.count }
+    var visibleCount: Int { collapsed ? 0 : 1 }
+    /// The mode the chat shows: the open one, or the one selected in Aster.
+    var currentMode: String { activeChatID ?? store.agent.id }
 
     init(store: AsterStore, open: @escaping () -> Void) {
         self.store = store; self.open = open
-        hidden = Set(UserDefaults.standard.stringArray(forKey: hiddenKey) ?? [])
         collapsed = UserDefaults.standard.bool(forKey: "AsterDesktopCollapsed")
         drafts = store.state.desktopDrafts
         synchronize(); restoreVisible()
     }
+    private func home(on screen: CGRect) -> CGRect {
+        CGRect(x: screen.maxX - DesktopLayout.margin - Self.mascotSize.width, y: screen.maxY - DesktopLayout.margin - Self.mascotSize.height,
+               width: Self.mascotSize.width, height: Self.mascotSize.height)
+    }
     func synchronize() {
-        guard let screen = NSScreen.main ?? NSScreen.screens.first else { return }
-        let agents = store.state.specialists
-        let frames = DesktopLayout.column(count: agents.count, screen: screen.visibleFrame, topInset: 44)
-        let oldFrames = DesktopLayout.column(count: agents.count, screen: screen.visibleFrame)
-        if fold == nil {
-            let panel = NSPanel(contentRect: CGRect(x: screen.visibleFrame.maxX - 56, y: screen.visibleFrame.maxY - 44, width: 44, height: 32), styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
-            configure(panel, title: "Aster · Equipo")
-            panel.contentView = NSHostingView(rootView: DesktopFoldView(desktop: self).environmentObject(store))
-            fold = panel
-        }
-        let migrateDock = !defaults.bool(forKey: "AsterDesktopShelfLayout")
-        for (index, agent) in agents.enumerated() {
-            if let panel = panels[agent.id] { panel.title = "Aster · \(agent.name)"; continue }
-            let panel = NSPanel(contentRect: frames[index], styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
-            configure(panel, title: "Aster · \(agent.name)")
-            if let saved = defaults.string(forKey: positionKey(agent.id)) {
-                let savedFrame = NSRectFromString(saved)
-                let wasDocked = abs(savedFrame.minX - oldFrames[index].minX) < 2 && abs(savedFrame.minY - oldFrames[index].minY) < 2
-                if savedFrame.origin.x.isFinite, savedFrame.origin.y.isFinite, savedFrame.width > 0, !(migrateDock && wasDocked) {
-                    panel.setFrame(DesktopLayout.clamped(CGRect(origin: savedFrame.origin, size: frames[index].size), screens: NSScreen.screens.map(\.visibleFrame)), display: false)
-                }
+        guard mascot == nil, let screen = NSScreen.main ?? NSScreen.screens.first else { return }
+        let panel = NSPanel(contentRect: home(on: screen.visibleFrame), styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+        configure(panel, title: "Aster")
+        if let saved = defaults.string(forKey: positionKey) {
+            let frame = NSRectFromString(saved)
+            if frame.origin.x.isFinite, frame.origin.y.isFinite, frame.width > 0 {
+                panel.setFrame(DesktopLayout.clamped(CGRect(origin: frame.origin, size: Self.mascotSize), screens: NSScreen.screens.map(\.visibleFrame)), display: false)
             }
-            panels[agent.id] = panel; installAvatar(agent.id, panel: panel)
-            moveObservers[agent.id] = NotificationCenter.default.addObserver(forName: NSWindow.didMoveNotification, object: panel, queue: .main) { [weak self] _ in
-                Task { @MainActor in self?.rememberPosition(agent.id) }
-            }
-            savePosition(agent.id)
         }
-        defaults.set(true, forKey: "AsterDesktopShelfLayout")
-        for id in Set(panels.keys).subtracting(agents.map(\.id)) {
-            if let observer = moveObservers.removeValue(forKey: id) { NotificationCenter.default.removeObserver(observer) }
-            panels.removeValue(forKey: id)?.orderOut(nil)
-            if activeChatID == id { closeChat() }
+        panel.contentView = NSHostingView(rootView: FloatingView(
+            open: { [weak self] in self?.expandChat() }, talk: { [weak self] in guard let self else { return }; self.showChat(self.currentMode, focus: true) },
+            dictate: { [weak self] in self?.dictate() }, arrange: { [weak self] in self?.arrange() }, hide: { [weak self] in self?.hideAll() },
+            moved: { [weak self] in self?.endDrag() }, dragStarted: { [weak self] in self?.beginDrag() },
+            hover: { [weak self] inside in self?.hover(inside) }).environmentObject(store))
+        mascot = panel
+        moveObserver = NotificationCenter.default.addObserver(forName: NSWindow.didMoveNotification, object: panel, queue: .main) { [weak self] _ in
+            Task { @MainActor in self?.rememberPosition() }
         }
+        savePosition()
     }
     private func configure(_ panel: NSPanel, title: String) {
         panel.title = title; panel.isOpaque = false; panel.backgroundColor = .clear; panel.hasShadow = false
         panel.level = .floating; panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         panel.hidesOnDeactivate = false; panel.isReleasedWhenClosed = false
     }
-    private func installAvatar(_ id: String, panel: NSPanel) {
-        panel.contentView = NSHostingView(rootView: FloatingView(agentID: id, height: panel.frame.height,
-            open: { [weak self] in self?.expandChat(id) }, talk: { [weak self] in self?.showChat(id, focus: true) },
-            arrange: { [weak self] in self?.arrange() }, hide: { [weak self] in self?.hide(id) },
-            moved: { [weak self] in self?.endDrag(id) }, dragStarted: { [weak self] in self?.beginDrag(id) },
-            hover: { [weak self] inside in self?.hover(id, inside: inside) }).environmentObject(store))
-    }
-    private func hide(_ id: String) {
-        hidden.insert(id); defaults.set(Array(hidden), forKey: hiddenKey)
-        if let panel = panels[id] { setVisible(panel, false, offset: CGPoint(x: 0, y: 12)) }
-        if activeChatID == id { closeChat() }; objectWillChange.send()
-    }
-    func showAll() { hidden.removeAll(); defaults.set([], forKey: hiddenKey); synchronize(); setCollapsed(false) }
+    func showAll() { setCollapsed(false) }
     func hideAll() { setCollapsed(true) }
-    func toggleCollapsed() { if visibleCount == 0 { showAll() } else { setCollapsed(!collapsed) } }
+    func toggleCollapsed() { setCollapsed(!collapsed) }
     private func setCollapsed(_ value: Bool) {
-        withAnimation(AsterMotion.spring(NSWorkspace.shared.accessibilityDisplayShouldReduceMotion)) { collapsed = value }
-        defaults.set(value, forKey: "AsterDesktopCollapsed")
+        collapsed = value; defaults.set(value, forKey: "AsterDesktopCollapsed")
         if value { closeChat() }; restoreVisible()
     }
     func arrange() {
-        guard let screen = NSScreen.main ?? NSScreen.screens.first else { return }
-        let frames = DesktopLayout.column(count: store.state.specialists.count, screen: screen.visibleFrame, topInset: 44)
-        for (index, agent) in store.state.specialists.enumerated() {
-            guard let panel = panels[agent.id] else { continue }
-            panel.setFrame(frames[index], display: true); installAvatar(agent.id, panel: panel); savePosition(agent.id)
-        }
-        fold?.setFrameOrigin(CGPoint(x: screen.visibleFrame.maxX - 56, y: screen.visibleFrame.maxY - 44))
+        guard let screen = NSScreen.main ?? NSScreen.screens.first, let mascot else { return }
+        mascot.setFrame(home(on: screen.visibleFrame), display: true); savePosition()
         showAll(); if let id = activeChatID { positionChat(id) }
     }
-    func constrainToScreens() {
-        for id in panels.keys { savePosition(id) }
-        if let fold { fold.setFrame(DesktopLayout.clamped(fold.frame, screens: NSScreen.screens.map(\.visibleFrame)), display: true) }
-        if let id = activeChatID { positionChat(id) }
+    func constrainToScreens() { savePosition(); if let id = activeChatID { positionChat(id) } }
+    private func savePosition() {
+        guard let mascot else { return }
+        mascot.setFrame(DesktopLayout.clamped(mascot.frame, screens: NSScreen.screens.map(\.visibleFrame)), display: true); rememberPosition()
     }
-    private func savePosition(_ id: String) {
-        guard let panel = panels[id] else { return }
-        panel.setFrame(DesktopLayout.clamped(panel.frame, screens: NSScreen.screens.map(\.visibleFrame)), display: true); rememberPosition(id)
-    }
-    private func rememberPosition(_ id: String) {
-        guard let panel = panels[id] else { return }
-        let value = NSStringFromRect(panel.frame)
-        if defaults.string(forKey: positionKey(id)) != value { defaults.set(value, forKey: positionKey(id)) }
+    private func rememberPosition() {
+        guard let mascot else { return }
+        let value = NSStringFromRect(mascot.frame)
+        if defaults.string(forKey: positionKey) != value { defaults.set(value, forKey: positionKey) }
     }
     private func restoreVisible(animated: Bool = true) {
-        guard !suspended else { return }
-        if let fold { setVisible(fold, true, animated: animated, offset: CGPoint(x: 0, y: 4)) }
-        for (index, agent) in store.state.specialists.enumerated() {
-            guard let panel = panels[agent.id] else { continue }
-            setVisible(panel, !collapsed && !hidden.contains(agent.id), animated: animated,
-                       offset: CGPoint(x: 0, y: 12), delay: Double(index) * 0.014)
-        }
+        guard !suspended, let mascot else { return }
+        setVisible(mascot, !collapsed, animated: animated, offset: CGPoint(x: 0, y: 10))
     }
     func suspend() {
         suspended = true; closeChat(animated: false)
-        if let fold { setVisible(fold, false, animated: false) }
-        panels.values.forEach { setVisible($0, false, animated: false) }
+        if let mascot { setVisible(mascot, false, animated: false) }
     }
     func resume() { suspended = false; restoreVisible() }
 
-    // Animate the composited content, keeping the saved desktop window positions fixed.
+    // Animate the composited content, keeping the saved desktop window position fixed.
     // A revision cancels an older fade-out when the user opens the panel again quickly.
     private func setVisible(_ panel: NSPanel, _ visible: Bool, animated: Bool = true,
                             offset: CGPoint = .zero, delay: Double = 0, refresh: Bool = false,
@@ -188,22 +152,22 @@ import QuartzCore
         CATransaction.begin(); CATransaction.setDisableActions(true)
         layer.opacity = 1; layer.transform = CATransform3DIdentity; CATransaction.commit()
     }
-    private func beginDrag(_ id: String) { dragging.insert(id); hoverTask?.cancel(); hoveredAgent = nil; closeChat() }
-    private func endDrag(_ id: String) { dragging.remove(id); savePosition(id) }
+    private func beginDrag() { dragging = true; hoverTask?.cancel(); hoveringMascot = false; closeChat() }
+    private func endDrag() { dragging = false; savePosition() }
 
-    func hover(_ id: String, inside: Bool) {
-        guard !collapsed, !suspended, dragging.isEmpty else { return }
+    func hover(_ inside: Bool) {
+        guard !collapsed, !suspended, !dragging else { return }
         if inside {
-            hoveredAgent = id; closeTask?.cancel()
-            guard !pinned || activeChatID == id else { return }
+            hoveringMascot = true; closeTask?.cancel()
+            guard !pinned else { return }
             hoverTask?.cancel()
             hoverTask = Task { [weak self] in
                 do { try await Task.sleep(for: .milliseconds(240)) } catch { return }
-                guard let self, self.hoveredAgent == id, !self.collapsed, !self.suspended, self.dragging.isEmpty, NSApplication.shared.modalWindow == nil else { return }
-                self.showChat(id)
+                guard let self, self.hoveringMascot, !self.collapsed, !self.suspended, !self.dragging, NSApplication.shared.modalWindow == nil else { return }
+                self.showChat(self.currentMode)
             }
         } else {
-            if hoveredAgent == id { hoveredAgent = nil; hoverTask?.cancel() }
+            hoveringMascot = false; hoverTask?.cancel()
             scheduleClose()
         }
     }
@@ -212,11 +176,11 @@ import QuartzCore
         closeTask?.cancel()
         closeTask = Task { [weak self] in
             do { try await Task.sleep(for: .milliseconds(550)) } catch { return }
-            guard let self, let id = self.activeChatID, !self.pinned, !self.chatHovered, self.hoveredAgent != id,
+            guard let self, let id = self.activeChatID, !self.pinned, !self.chatHovered, !self.hoveringMascot, !self.store.listener.active,
                   (self.drafts[id] ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
                   !self.store.isRunning(self.store.desktopMission(for: id)?.id) else { return }
             let pointer = NSEvent.mouseLocation
-            if self.chat?.frame.insetBy(dx: -10, dy: -10).contains(pointer) == true || self.panels[id]?.frame.insetBy(dx: -10, dy: -10).contains(pointer) == true {
+            if self.chat?.frame.insetBy(dx: -10, dy: -10).contains(pointer) == true || self.mascot?.frame.insetBy(dx: -10, dy: -10).contains(pointer) == true {
                 self.scheduleClose(); return
             }
             self.closeChat()
@@ -237,11 +201,11 @@ import QuartzCore
         flushDrafts()
         if store.sendDesktop(text, agentID: id) { pinned = true; drafts[id] = ""; flushDrafts() }
     }
-    /// Push-to-talk: opens the companion's chat, writes the words into its draft as they are heard,
-    /// and sends them after a pause. Calling it again while listening finishes early.
+    /// Push-to-talk: opens the chat in the current mode, writes the words into its draft as they are
+    /// heard, and sends them after a pause. Calling it again while listening finishes early.
     func dictate(_ requested: String? = nil) {
         if store.listener.active { store.listener.finish(); return }
-        let id = requested ?? activeChatID ?? store.agent.id
+        let id = requested ?? currentMode
         showChat(id); pinned = true
         let typed = drafts[id] ?? "", prefix = typed.isEmpty || typed.hasSuffix(" ") || typed.hasSuffix("\n") ? typed : typed + " "
         store.startDictation(onUpdate: { [weak self] heard in self?.setDraft(prefix + heard, agentID: id) }, onFinish: { [weak self] heard in
@@ -250,36 +214,34 @@ import QuartzCore
             if store.sendDesktop(prefix + heard, agentID: id, spoken: true) { drafts[id] = ""; flushDrafts() }
         })
     }
+    /// Switches the chat to another mode, which becomes Aster's selected mode too.
+    func selectMode(_ id: String) {
+        guard id != activeChatID, store.state.specialists.contains(where: { $0.id == id }) else { return }
+        store.select(id); showChat(id); pinned = true
+    }
     func showChat(_ id: String, focus: Bool = false) {
         guard !suspended, store.state.specialists.contains(where: { $0.id == id }) else { return }
         hoverTask?.cancel(); closeTask?.cancel()
         if collapsed { setCollapsed(false) }
-        let changedAgent = activeChatID != id
-        if changedAgent { flushDrafts(); activeChatID = id; pinned = false }
+        if activeChatID != id { flushDrafts(); activeChatID = id }
         if chat == nil {
             let panel = MiniChatPanel(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
-            configure(panel, title: "Aster · Chat rápido"); panel.hasShadow = true; panel.becomesKeyOnlyIfNeeded = true
+            configure(panel, title: "Aster"); panel.hasShadow = true; panel.becomesKeyOnlyIfNeeded = true
             panel.closeRequested = { [weak self] in self?.closeChat() }
             let hosting = MiniChatHostingView(rootView: DesktopChatView(desktop: self).environmentObject(store))
             hosting.hoverChanged = { [weak self] in self?.chatHover($0) }; panel.contentView = hosting
             chat = panel
         }
-        chat?.title = LF("Chat rápido · %@", store.state.specialists.first { $0.id == id }?.name ?? "Aster")
+        chat?.title = store.state.specialists.first { $0.id == id }?.title ?? "Aster"
         let preference = AsterAppearance(rawValue: defaults.string(forKey: "AsterAppearance") ?? "system")
         chat?.appearance = preference?.scheme.map { NSAppearance(named: $0 == .dark ? .darkAqua : .aqua) } ?? nil
-        positionChat(id, animated: changedAgent && chat?.isVisible == true)
-        if let chat { setVisible(chat, true, offset: CGPoint(x: 8, y: -4), refresh: changedAgent) }
+        positionChat(id)
+        if let chat { setVisible(chat, true, offset: CGPoint(x: 8, y: -4)) }
         if focus { pinned = true; focusInput() }
     }
-    private func positionChat(_ id: String, animated: Bool = false) {
-        guard let anchor = panels[id], let screen = NSScreen.screens.first(where: { $0.visibleFrame.contains(CGPoint(x: anchor.frame.midX, y: anchor.frame.midY)) }) ?? NSScreen.main else { return }
-        let frame = DesktopLayout.chatFrame(anchor: anchor.frame, screen: screen.visibleFrame)
-        if animated, !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
-            NSAnimationContext.runAnimationGroup { context in
-                context.duration = 0.18; context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
-                chat?.animator().setFrame(frame, display: true)
-            }
-        } else { chat?.setFrame(frame, display: true) }
+    private func positionChat(_ id: String) {
+        guard let anchor = mascot, let screen = NSScreen.screens.first(where: { $0.visibleFrame.contains(CGPoint(x: anchor.frame.midX, y: anchor.frame.midY)) }) ?? NSScreen.main else { return }
+        chat?.setFrame(DesktopLayout.chatFrame(anchor: anchor.frame, screen: screen.visibleFrame, size: Self.chatSize), display: true)
     }
     func focusInput() {
         guard let chat else { return }; pinned = true; chat.makeKeyAndOrderFront(nil)
@@ -301,7 +263,7 @@ import QuartzCore
         }
     }
     func expandChat(_ agentID: String? = nil) {
-        guard let id = agentID ?? activeChatID else { return }
+        let id = agentID ?? currentMode
         if let mission = store.desktopMission(for: id) { store.openMission(mission.id) }
         else { store.select(id); store.selectedMission = nil; store.page = "Personajes" }
         closeChat(); open()
@@ -328,9 +290,9 @@ final class MiniChatHostingView<Content: View>: NSHostingView<Content> {
 }
 
 struct CompanionInteraction: NSViewRepresentable {
-    var name: String
     var open: () -> Void
     var talk: () -> Void
+    var dictate: () -> Void
     var arrange: () -> Void
     var hide: () -> Void
     var moved: () -> Void
@@ -338,12 +300,12 @@ struct CompanionInteraction: NSViewRepresentable {
     var hover: (Bool) -> Void
     func makeNSView(context: Context) -> Handle { Handle() }
     func updateNSView(_ view: Handle, context: Context) {
-        view.open = open; view.talk = talk; view.arrange = arrange; view.hide = hide; view.moved = moved; view.dragStarted = dragStarted; view.hover = hover
-        view.setAccessibilityElement(true); view.setAccessibilityRole(.button); view.setAccessibilityLabel(LF("Hablar con %@", name))
+        view.open = open; view.talk = talk; view.dictate = dictate; view.arrange = arrange; view.hide = hide; view.moved = moved; view.dragStarted = dragStarted; view.hover = hover
+        view.setAccessibilityElement(true); view.setAccessibilityRole(.button); view.setAccessibilityLabel(L("Hablar con Aster"))
         view.setAccessibilityHelp(L("Cursor para hablar · arrastra para mover · doble clic para abrir Aster"))
     }
     final class Handle: NSView {
-        var open: () -> Void = {}; var talk: () -> Void = {}; var arrange: () -> Void = {}; var hide: () -> Void = {}
+        var open: () -> Void = {}; var talk: () -> Void = {}; var dictate: () -> Void = {}; var arrange: () -> Void = {}; var hide: () -> Void = {}
         var moved: () -> Void = {}; var dragStarted: () -> Void = {}; var hover: (Bool) -> Void = { _ in }
         private var area: NSTrackingArea?
         override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
@@ -363,13 +325,13 @@ struct CompanionInteraction: NSViewRepresentable {
         }
         override func rightMouseDown(with event: NSEvent) {
             let menu = NSMenu()
-            for (title, action) in [("Chat rápido", #selector(talkMenu)), ("Abrir Aster", #selector(openMenu)), ("Ordenar arriba a la derecha", #selector(arrangeMenu)), ("Ocultar compañero", #selector(hideMenu))] {
+            for (title, action) in [("Chat rápido", #selector(talkMenu)), ("Hablar · ⌥Espacio", #selector(dictateMenu)), ("Abrir Aster", #selector(openMenu)), ("Ordenar arriba a la derecha", #selector(arrangeMenu)), ("Ocultar Aster", #selector(hideMenu))] {
                 menu.addItem(withTitle: L(title), action: action, keyEquivalent: "").target = self
             }
             NSMenu.popUpContextMenu(menu, with: event, for: self)
         }
         override func accessibilityPerformPress() -> Bool { talk(); return true }
-        @objc private func talkMenu() { talk() }; @objc private func openMenu() { open() }
+        @objc private func talkMenu() { talk() }; @objc private func dictateMenu() { dictate() }; @objc private func openMenu() { open() }
         @objc private func arrangeMenu() { arrange() }; @objc private func hideMenu() { hide() }
     }
 }

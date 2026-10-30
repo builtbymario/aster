@@ -3,6 +3,7 @@ import SwiftUI
 import EventKit
 import UserNotifications
 import AVFoundation
+import Combine
 
 @MainActor final class AsterStore: ObservableObject {
     @Published var state = SavedState()
@@ -17,6 +18,13 @@ import AVFoundation
     var hasCapacity: Bool { activities.count < parallelLimit }
     func isRunning(_ id: UUID?) -> Bool { id.map { activities[$0] != nil } ?? false }
     func isAgentWorking(_ id: String) -> Bool { state.missions.contains { $0.specialistID == id && isRunning($0.id) } }
+    /// Aster's face on a surface: listening, speaking, thinking for that mode (or any work), or calm.
+    func mood(for agentID: String? = nil) -> AvatarMood {
+        if listener.phase == .listening { return .listening }
+        if speaking { return .speaking }
+        if agentID.map(isAgentWorking) ?? busy { return .thinking }
+        return .calm
+    }
     func activity(for id: UUID?) -> String { id.flatMap { activities[$0] } ?? "" }
     func setActivity(_ text: String, for id: UUID) { if runtimes[id] != nil { activities[id] = text } }
     private final class Runtime {
@@ -49,6 +57,7 @@ import AVFoundation
     let listener: VoiceInput
     /// Quick chats whose question was spoken, so their answer is read aloud.
     private var spokenTurns = Set<UUID>()
+    private var listenerChanges: AnyCancellable?
     /// Reads a spoken question's answer aloud; replaceable so tests never play audio.
     lazy var replySpeaker: (String, String) -> Void = { [weak self] text, agentID in self?.say(text, agentID: agentID) }
     let computer = ComputerController()
@@ -108,6 +117,7 @@ import AVFoundation
         }
         voice.stateChanged = { [weak self] in self?.speaking = $0 }
         voice.failed = { [weak self] in self?.notice = $0 }
+        listenerChanges = self.listener.objectWillChange.sink { [weak self] _ in self?.objectWillChange.send() }
         computer.onNarration = { [weak self] text in
             guard let self, self.state.preferences.narrateComputer != false else { return }
             self.voice.narrate(text, language: VoiceText.language(text, fallback: UserDefaults.standard.string(forKey: "AsterLanguage") ?? "es"))
@@ -203,7 +213,7 @@ import AVFoundation
         return result
     }
     private func inputContext(text: String, company: Company?, attachments: [Attachment], agentID: String) -> String {
-        var context: [String: Any] = ["user_name": settings.userName, "response_language": settings.responseLanguage, "tone": settings.tone, "detail": settings.detail, "local_time": Date().formatted(.iso8601), "time_zone": TimeZone.current.identifier, "connected_sources": ["apple_mail": state.preferences.watchMail, "calendar": state.preferences.watchCalendar, "apple_reminders": state.preferences.watchReminders == true, "apple_health_import": state.health != nil], "team": state.specialists.map { ["name": $0.name, "role": $0.role, "personality": $0.personality ?? ""] }]
+        var context: [String: Any] = ["user_name": settings.userName, "response_language": settings.responseLanguage, "tone": settings.tone, "detail": settings.detail, "local_time": Date().formatted(.iso8601), "time_zone": TimeZone.current.identifier, "connected_sources": ["apple_mail": state.preferences.watchMail, "calendar": state.preferences.watchCalendar, "apple_reminders": state.preferences.watchReminders == true, "apple_health_import": state.health != nil], "modes": state.specialists.map { ["mode": $0.mode, "role": $0.role] }]
         if let company { context["company"] = ["name": company.name, "goal": company.goal, "notes": company.notes] }
         if settings.useMemory {
             context["memory"] = memoryContext(companyID: company?.id)

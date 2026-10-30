@@ -14,7 +14,7 @@ struct ComputerWorkspaceView: View {
             VStack(alignment: .leading, spacing: 18) {
                 HStack(alignment: .top) {
                     VStack(alignment: .leading, spacing: 7) {
-                        Text(L("Una mano en tu Mac.")).font(.system(size: 30, weight: .semibold, design: .rounded)).tracking(-0.8)
+                        Text(L("Una mano en tu Mac.")).font(.system(size: 30, weight: .semibold)).tracking(-0.8)
                         Text(L("Estudia, crea y trabaja con tus apps. Mira cada paso.")).font(.system(size: 12)).foregroundStyle(.secondary)
                     }
                     Spacer()
@@ -68,7 +68,7 @@ struct ComputerWorkspaceView: View {
     }
     private var taskComposer: some View {
         VStack(alignment: .leading, spacing: 14) {
-            HStack { Text(L("¿Qué hacemos juntos?")).font(.system(size: 15, weight: .semibold)); Spacer(); Picker(L("Compañero"), selection: $agentID) { ForEach(store.state.specialists) { Text($0.name).tag($0.id) } }.frame(width: 150) }
+            HStack { Text(L("¿Qué hacemos juntos?")).font(.system(size: 15, weight: .semibold)); Spacer(); Picker(L("Modo"), selection: $agentID) { ForEach(store.state.specialists) { Text($0.mode).tag($0.id) } }.frame(width: 150) }
             TextEditor(text: $task).font(.system(size: 14)).scrollContentBackground(.hidden).frame(height: 70).padding(10).background(.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 12)).accessibilityLabel(L("Tarea para el ordenador"))
             HStack(spacing: 8) {
                 Button(L("Una hoja de Excel")) { task = L("Abre Excel y crea una hoja nueva con una tabla de presupuesto mensual. Añade ingresos, gastos, totales y fórmulas. Explícame cada paso y comprueba los resultados.") }

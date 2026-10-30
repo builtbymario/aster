@@ -37,7 +37,7 @@ struct RichMessage: View, Equatable {
                         }.padding(.horizontal, 13).padding(.vertical, 9).background(.primary.opacity(0.035))
                         ScrollView(.horizontal) { Text(verbatim: block.text).font(.system(size: 11, design: .monospaced)).lineSpacing(4).textSelection(.enabled).padding(14).frame(maxWidth: .infinity, alignment: .leading) }
                     }.background(.primary.opacity(0.025), in: RoundedRectangle(cornerRadius: 12)).clipShape(RoundedRectangle(cornerRadius: 12)).overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(.primary.opacity(0.07)))
-                case .heading(let level): Text(.init(block.text)).font(.system(size: level == 1 ? 21 : level == 2 ? 17 : 14, weight: .semibold, design: .rounded)).textSelection(.enabled).padding(.top, 5)
+                case .heading(let level): Text(.init(block.text)).font(.system(size: level == 1 ? 21 : level == 2 ? 17 : 14, weight: .semibold)).textSelection(.enabled).padding(.top, 5)
                 case .text: Text(.init(block.text)).font(.system(size: 13)).lineSpacing(5).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading)
                 }
             }

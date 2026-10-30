@@ -188,7 +188,7 @@ import Combine
     private func sendSnapshot() async {
         guard enabled, connection.peerOnline, let store else { return }
         let state = store.state
-        var snapshot = RemoteSnapshot(name: pairing?.name ?? "Mac", agents: state.specialists.map { .init(id: $0.id, name: $0.name, role: $0.role, busy: store.isAgentWorking($0.id)) },
+        var snapshot = RemoteSnapshot(name: pairing?.name ?? "Mac", agents: state.specialists.map { .init(id: $0.id, name: $0.title, role: $0.role, busy: store.isAgentWorking($0.id)) },
             missions: state.missions.filter { $0.archived != true }.prefix(60).map { .init(id: $0.id, title: String($0.title.prefix(180)), agentID: $0.specialistID, status: $0.status, activity: String(store.activity(for: $0.id).prefix(500)), updated: $0.updated) },
             companies: store.companies.map { .init(id: $0.id, name: String($0.name.prefix(180))) }, connectionReady: store.connectionReady,
             screenAllowed: MacDesktop.canSee && !screenLocked, controlAllowed: MacDesktop.canControl && !screenLocked, canControlRemotely: allowControl,

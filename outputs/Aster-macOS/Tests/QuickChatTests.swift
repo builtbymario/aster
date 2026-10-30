@@ -172,7 +172,7 @@ final class QuickChatTests: XCTestCase {
         XCTAssertEqual(store.state.toolReceipts.last?.sessionID, "direct-" + mission.id.uuidString)
         let first = try XCTUnwrap(provider.requests.first)
         XCTAssertEqual(first.model, "gpt-5.4-mini"); XCTAssertEqual(first.effort, "low"); XCTAssertTrue(first.history.isEmpty)
-        XCTAssertTrue(first.instructions.contains("Lumi") && first.input.contains("Aster application context"), "Persona and local context travel with the turn")
+        XCTAssertTrue(first.instructions.contains("You are Aster") && first.instructions.contains("Personal mode") && first.input.contains("Aster application context"), "One Aster, its mode and local context travel with the turn")
 
         XCTAssertTrue(store.sendDesktop("¿Y mañana?", agentID: "personal"))
         for _ in 0..<100 where store.busy { try await Task.sleep(for: .milliseconds(10)) }
