@@ -14,7 +14,10 @@ struct Specialist: Identifiable, Codable {
         .init(id: "builder", name: "Nova", role: "Desarrollo", detail: "Webs, productos y código. Construye, verifica y explica sus decisiones.", style: .init(form: .orbit, tint: .mint)),
         .init(id: "strategy", name: "Sage", role: "Negocio", detail: "Planes de negocio, investigación y escenarios con supuestos explícitos.", style: .init(form: .pebble, tint: .pearl)),
         .init(id: "personal", name: "Lumi", role: "Personal", detail: "Te ayuda a pensar, crear y cuidar de tu agenda y tus prioridades.", style: .init(form: .pill, tint: .ink)),
-        .init(id: "study", name: "Atlas", role: "Aprendizaje", detail: "Aprende contigo, explica paso a paso y te ayuda con documentos, Excel y tareas en tu Mac.", style: .init(form: .orbit, tint: .pearl))
+        .init(id: "study", name: "Atlas", role: "Aprendizaje", detail: "Aprende contigo, explica paso a paso y te ayuda con documentos, Excel y tareas en tu Mac.", style: .init(form: .orbit, tint: .pearl)),
+        .init(id: "research", name: "Aster", role: "Investigación", detail: "Investiga con fuentes verificables, compara opciones y separa los datos de las estimaciones.", style: .init()),
+        .init(id: "finance", name: "Aster", role: "Finanzas", detail: "Modelos financieros, costes, precios, métricas y escenarios con supuestos explícitos.", style: .init()),
+        .init(id: "content", name: "Aster", role: "Contenido", detail: "Escribe contenido con tu voz: posts, guiones, newsletters, presentaciones y textos de producto.", style: .init())
     ]
 }
 extension Specialist {
@@ -27,6 +30,9 @@ extension Specialist {
         case "strategy": return "Founder"
         case "personal": return "Personal"
         case "study": return "Study"
+        case "research": return "Research"
+        case "finance": return "Finance"
+        case "content": return "Content"
         default: return role
         }
     }
@@ -37,13 +43,16 @@ extension Specialist {
         case "strategy": return "briefcase"
         case "personal": return "heart"
         case "study": return "graduationcap"
+        case "research": return "magnifyingglass"
+        case "finance": return "chart.pie"
+        case "content": return "square.and.pencil"
         default: return "sparkle"
         }
     }
     /// "Aster · Builder", or "Aster" for the general mode.
     var title: String { id == "director" ? "Aster" : "Aster · " + mode }
     /// Modes in the order the interface shows them.
-    static let modeOrder = ["director", "study", "builder", "strategy", "growth", "personal"]
+    static let modeOrder = ["director", "study", "builder", "strategy", "research", "finance", "growth", "content", "personal"]
 }
 struct Company: Identifiable, Codable {
     var id = UUID()

@@ -69,7 +69,7 @@ final class RemoteTests: XCTestCase {
         try await Self.waitUntil("Real WebSocket handshake", { phone.peerOnline && bridge.connection.peerOnline })
         try await phone.send(.command, RemoteCommand(operation: .snapshot))
         try await Self.waitUntil("Authenticated Mac snapshot", { !snapshots.isEmpty })
-        Self.check(snapshots[0].agents.count == 6, "All six real Mac agents shared")
+        Self.check(snapshots[0].agents.count == Specialist.defaults.count, "Every mode is shared")
         try await phone.send(.command, command)
         try await Self.waitUntil("Task accepted", { receipts.contains(where: { $0.id == command.id }) })
         Self.check(receipts.last?.status == "accepted" && store.state.missions.count == 1, "Remote command invokes the actual store")

@@ -107,7 +107,7 @@ extension AsterStore {
     }
     func handleTool(_ session: String, call: PendingToolCall, missionID: UUID) async throws -> String {
         if let receipt = state.toolReceipts.first(where: { $0.sessionID == session && $0.turnID == call.turnID && $0.callID == call.callID }) { return receipt.output }
-        guard ["aster_mail", "aster_calendar", "aster_reminders", "aster_notify", "aster_health", "aster_computer", "aster_notes"].contains(call.name) else { return try performTool(session, call: call, missionID: missionID) }
+        guard ["aster_mail", "aster_calendar", "aster_reminders", "aster_notify", "aster_health", "aster_computer", "aster_notes", "aster_mission"].contains(call.name) else { return try performTool(session, call: call, missionID: missionID) }
         var output: [String: Any] = [:]
         switch call.name {
         case "aster_health":
@@ -188,6 +188,30 @@ extension AsterStore {
                 let notes = try await AppleNotes.search(call.arguments["query"] as? String ?? "", limit: call.arguments["limit"] as? Int ?? 10)
                 output["notes"] = notes.map { ["id": $0.id, "title": $0.title, "modified": $0.modified?.formatted(.iso8601) ?? ""] }
             }
+        case "aster_mission":
+            let brief = (call.arguments["brief"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            let kickoff = call.arguments["kickoff"] as? Bool == true
+            var company: Company?
+            if let name = (call.arguments["company"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines), !name.isEmpty {
+                company = companies.first { $0.name.localizedCaseInsensitiveCompare(name) == .orderedSame }
+                if company == nil {
+                    createCompany(name: String(name.prefix(120)), goal: String((brief.isEmpty ? name : brief).prefix(600)))
+                    company = companies.first { $0.name == String(name.prefix(120)) }
+                }
+            }
+            let started: Bool
+            if kickoff {
+                guard let company else { throw AsterError.message("Indica el nombre de la empresa para arrancar la startup.") }
+                started = launchStartup(company.id, background: true)
+            } else {
+                guard !brief.isEmpty else { throw AsterError.message("Describe qué debe entregar la misión.") }
+                let mode = (call.arguments["mode"] as? String).flatMap { id in state.specialists.first { $0.id == id }?.id } ?? "director"
+                started = run(String(brief.prefix(20000)), companyID: company?.id, fresh: true, specialistID: mode, background: true)
+            }
+            guard started, let mission = state.missions.first else { throw AsterError.message("Ahora hay demasiados trabajos en marcha. Inténtalo cuando termine alguno.") }
+            if let title = call.arguments["title"] as? String, !title.isEmpty, let index = state.missions.firstIndex(where: { $0.id == mission.id }) { state.missions[index].title = String(title.prefix(70)) }
+            output = ["started": true, "mission_id": mission.id.uuidString, "mode": mission.specialistID, "company": company?.name ?? "", "kickoff": kickoff,
+                      "note": "The mission runs in the background; its result and files appear in Aster's Missions and Inbox."]
         case "aster_computer":
             guard let task = (call.arguments["task"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines), !task.isEmpty else { throw AsterError.message("Describe la tarea que hay que hacer en el Mac.") }
             guard !computer.active else { throw AsterError.message("El Mac ya está haciendo otra tarea. Espera a que termine o detenla en Ordenador.") }

@@ -2,6 +2,17 @@
 
 Esta vista previa es nativa para **Apple Silicon e Intel, con macOS 14 o posterior**. Conserva tus personajes, conversaciones, empresas, memoria y preferencias de versiones anteriores. La app está firmada localmente y todavía no está notarizada para distribuirla a otros usuarios. Consulta **INSTALAR.md** antes de trasladarla a otro Mac; Intel se ha compilado, pero no probado en hardware real.
 
+## En desarrollo: Aster actúa por ti
+
+Desde la isla, Aster ya no solo responde: **hace cosas**. Pídeselo con texto o con la voz:
+
+- **Manejar tu Mac:** «abre Numbers y hazme una tabla de gastos de este mes». Aster ejecuta la tarea con el control del Mac, enseña cada paso, se detiene para pedirte permiso antes de enviar, comprar o borrar y te cuenta el resultado real, incluido lo que no le dejaste hacer. Si detienes el chat, se detiene también en el Mac.
+- **Tu pantalla:** pulsa el ojo del campo de escritura y la siguiente pregunta irá con una captura de la pantalla (sin las ventanas de Aster). Útil para un error de código, un ejercicio o una web. La captura solo acompaña a esa pregunta.
+- **Calendario, correo y notas:** crea eventos (sin invitar a nadie), prepara borradores en Mail para que los revises y los envíes tú (Aster nunca envía correo) y busca, lee y crea notas en Apple Notas (conéctalo en Ajustes → Conexiones).
+- **Misiones:** para entregables, investigación o código, Aster lanza una misión en segundo plano en el modo adecuado; el resultado llega a Misiones y Bandeja.
+- **Lanzar una startup:** «quiero montar una startup de apuntes para estudiantes». Aster crea la empresa y arranca a todos los departamentos en paralelo: estrategia, mercado con fuentes, producto e ingeniería, growth, finanzas con modelo en CSV y legal y operaciones, más las tareas de los próximos siete días. También desde Empresas con **Lanzar startup**. Nada se publica, se contrata, se paga ni se envía.
+- **Nueve modos:** General, Study, Builder, Founder, Research, Finance, Growth, Content y Personal.
+
 ## En desarrollo: seguridad de acciones
 
 Cuando Aster maneja tu Mac, cada clic, tecla o texto se revisa en el código antes de ejecutarse; no depende de que la IA se porte bien. Aster lee con Accesibilidad el control real que hay bajo el cursor y la app activa:

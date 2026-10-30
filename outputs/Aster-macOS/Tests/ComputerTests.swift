@@ -61,14 +61,14 @@ final class ComputerTests: XCTestCase {
             return try response("response2", action: "finish", extra: ["text": "Tabla comprobada."])
         }
         let controller = ComputerController(); var finished: ComputerRun?; controller.onFinished = { finished = $0 }
-        controller.start("Completar una tabla", agent: Specialist.defaults.last!, settings: .init(), api: api, backend: fixture, needsPermissions: false); try await wait(controller)
+        controller.start("Completar una tabla", agent: Specialist.defaults.first { $0.id == "study" }!, settings: .init(), api: api, backend: fixture, needsPermissions: false); try await wait(controller)
         check(requests == 2 && fixture.actions.count == 1 && fixture.captures == 2 && controller.result == "Tabla comprobada." && finished?.agentID == "study", "Capture, action, verification, narration and durable run result complete one flow")
         DesktopMockProtocol.handler = { _ in try response("duplicate", action: "click", extra: ["x": 10, "y": 10], duplicated: true) }
-        let blocked = ComputerController(); let untouched = DesktopFixture(); blocked.start("Invalid fixture", agent: Specialist.defaults.last!, settings: .init(), api: api, backend: untouched, needsPermissions: false); try await wait(blocked)
+        let blocked = ComputerController(); let untouched = DesktopFixture(); blocked.start("Invalid fixture", agent: Specialist.defaults.first { $0.id == "study" }!, settings: .init(), api: api, backend: untouched, needsPermissions: false); try await wait(blocked)
         check(!blocked.error.isEmpty && untouched.actions.isEmpty, "Malformed parallel actions never move the cursor")
         DesktopMockProtocol.handler = { _ in try response("paused", action: "click", extra: ["x": 10, "y": 10]) }
         let cancelled = ComputerController(); let pausedFixture = DesktopFixture(); pausedFixture.beforeAction = { cancelled.stop() }
-        cancelled.start("Cancellation fixture", agent: Specialist.defaults.last!, settings: .init(), api: api, backend: pausedFixture, needsPermissions: false); try await wait(cancelled)
+        cancelled.start("Cancellation fixture", agent: Specialist.defaults.first { $0.id == "study" }!, settings: .init(), api: api, backend: pausedFixture, needsPermissions: false); try await wait(cancelled)
         check(pausedFixture.actions.isEmpty, "Cancellation at action boundary prevents all input")
         let long = String(repeating: "Una frase clara. ", count: 500); let chunks = VoiceText.chunks(long)
         check(chunks.count > 1 && chunks.allSatisfy { $0.count <= 1700 } && chunks.joined(separator: " ") == long.trimmingCharacters(in: .whitespaces), "Voice segmentation preserves text and stays below API limits")

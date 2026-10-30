@@ -119,7 +119,8 @@ import Combine
         }
         // Catalan is no longer offered; answers follow the user's message instead.
         if state.preferences.intelligence?.responseLanguage == "ca" { state.preferences.intelligence?.responseLanguage = "auto" }
-        if !state.specialists.contains(where: { $0.id == "study" }) { state.specialists.append(Specialist.defaults.first { $0.id == "study" }!) }
+        // Modes added in later versions join existing workspaces.
+        for mode in Specialist.defaults where !state.specialists.contains(where: { $0.id == mode.id }) { state.specialists.append(mode) }
         if state.preferences.watchReminders == true { remindersStatus = EKEventStore.authorizationStatus(for: .reminder) == .fullAccess ? "Conectado" : "Permiso pendiente" }
         if state.preferences.watchCalendar { calendarStatus = EKEventStore.authorizationStatus(for: .event) == .fullAccess ? "Conectado" : "Permiso pendiente" }
         if state.preferences.watchMail { mailStatus = "Activado · pendiente de revisión" }
@@ -562,6 +563,22 @@ import Combine
             } catch { calendarStatus = error.localizedDescription }
         }
     }
+    /// The full startup kickoff: a coordinated mission where every department prepares its deliverable.
+    @discardableResult func launchStartup(_ companyID: UUID, background: Bool = false) -> Bool {
+        guard companies.contains(where: { $0.id == companyID }) else { return false }
+        return run(L(Self.startupBrief), companyID: companyID, fresh: true, specialistID: "director", background: background)
+    }
+    static let startupBrief = """
+    Arranca esta startup desde cero con todos sus departamentos. Coordina especialistas en paralelo y entrega un paquete revisable en /workspace/outputs:
+    00-resumen.md: la startup en una página y las cinco decisiones más importantes.
+    01-estrategia.md: problema, cliente ideal, propuesta de valor, modelo de negocio y precios, con supuestos explícitos.
+    02-mercado.md: tamaño de mercado con supuestos, competidores y alternativas con fuentes citadas, y riesgos.
+    03-producto.md: alcance del MVP, historias de usuario, arquitectura técnica recomendada y plan de seis semanas.
+    04-growth.md: posicionamiento, canales, plan de lanzamiento, cómo conseguir los primeros 50 clientes y calendario de contenido de cuatro semanas.
+    05-finanzas.csv y 05-finanzas.md: economía unitaria, modelo mensual a 12 meses, runway y opciones de financiación, marcando qué es estimación.
+    06-legal-operaciones.md: puntos a revisar con un profesional (forma jurídica, propiedad intelectual, privacidad), herramientas y procesos. No es asesoramiento legal.
+    Después crea en Aster las tareas de los próximos siete días con aster_create_task. No publiques, no contrates, no gastes dinero ni envíes nada: deja todo preparado para que yo lo revise.
+    """
     func connectNotes() {
         Task {
             notesStatus = "Solicitando acceso a Apple Notas"

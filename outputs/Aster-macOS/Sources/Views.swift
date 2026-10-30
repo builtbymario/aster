@@ -199,7 +199,7 @@ struct MainView: View {
         .animation(AsterMotion.spring(reduceMotion), value: store.agent.id)
     }
     private var agentDock: some View {
-        HStack(spacing: 8) {
+        LazyVGrid(columns: [GridItem(.adaptive(minimum: 128), spacing: 8)], spacing: 8) {
             ForEach(Specialist.modeOrder.compactMap { id in store.state.specialists.first { $0.id == id } }) { agent in
                 let selected = store.agent.id == agent.id
                 Button { select(agent.id) } label: {
@@ -275,6 +275,17 @@ struct MainView: View {
                             Label(LF("%d misiones", store.state.missions.filter { $0.companyID == company.id }.count), systemImage: "bubble.left.and.bubble.right")
                             Label(LF("%d tareas pendientes", store.state.tasks.filter { $0.companyID == company.id && !$0.done }.count), systemImage: "checklist")
                         }.font(.system(size: 10)).foregroundStyle(muted)
+                        Button { store.launchStartup(company.id) } label: {
+                            HStack(spacing: 10) {
+                                Image(systemName: "paperplane.fill").font(.system(size: 13, weight: .semibold))
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(L("Lanzar startup")).font(.system(size: 13, weight: .semibold))
+                                    Text(L("Todos los departamentos en paralelo: estrategia, mercado, producto, growth, finanzas y legal.")).font(.system(size: 11)).opacity(0.85)
+                                }
+                                Spacer(); Image(systemName: "arrow.right").font(.system(size: 11, weight: .semibold))
+                            }.padding(.horizontal, 14).padding(.vertical, 11).foregroundStyle(Color.asterOnAccent)
+                                .background(Color.asterAccent, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                        }.buttonStyle(FluidButtonStyle()).disabled(!store.hasCapacity)
                         HStack(spacing: 10) {
                             companyAction("Plan de negocio", agent: "strategy", company: company, input: "Prepara un plan de negocio útil: propuesta de valor, mercado, riesgos, costes, supuestos y próximos pasos.")
                             companyAction("Marketing", agent: "growth", company: company, input: "Prepara una estrategia de marketing y un primer calendario de contenidos con objetivos medibles.")
