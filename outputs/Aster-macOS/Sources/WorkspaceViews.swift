@@ -19,7 +19,7 @@ struct TaskBoardView: View {
                 if section == "Aster" {
                 HStack {
                     TextField(L("Buscar tareas…"), text: $query).textFieldStyle(.roundedBorder)
-                    Picker(L("Empresa"), selection: $companyID) { Text(L("Todas las empresas")).tag(nil as UUID?); ForEach(store.companies) { Text($0.name).tag(Optional($0.id)) } }.frame(width: 200)
+                    Picker(L("Proyecto"), selection: $companyID) { Text(L("Todos los proyectos")).tag(nil as UUID?); ForEach(store.companies) { Text($0.name).tag(Optional($0.id)) } }.frame(width: 200)
                     Toggle(L("Terminadas"), isOn: $completed).toggleStyle(.switch)
                 }.font(.system(size: 11))
                 if tasks.isEmpty { WorkspaceEmpty(symbol: "checklist", title: "Un buen siguiente paso", detail: "Añade una tarea o pide al equipo que guarde los próximos pasos de una misión.") }
@@ -83,7 +83,7 @@ struct TaskForm: View {
         VStack(alignment: .leading, spacing: 21) {
             HStack { Text(L("Un siguiente paso.")).font(.system(size: 26, weight: .semibold)); Spacer(); GlassIconButton(symbol: "xmark", title: "Cerrar") { dismiss() } }
             TextField(L("¿Qué hay que hacer?"), text: $title, axis: .vertical).lineLimit(2...4).textFieldStyle(.roundedBorder)
-            Picker(L("Empresa"), selection: $companyID) { Text(L("Personal")).tag(nil as UUID?); ForEach(store.companies) { Text($0.name).tag(Optional($0.id)) } }
+            Picker(L("Proyecto"), selection: $companyID) { Text(L("Personal")).tag(nil as UUID?); ForEach(store.companies) { Text($0.name).tag(Optional($0.id)) } }
             Picker(L("Modo"), selection: $agentID) { ForEach(store.state.specialists) { Text($0.mode + " · " + L($0.role)).tag($0.id) } }
             Toggle(L("Añadir fecha"), isOn: $hasDue).toggleStyle(.switch)
             if hasDue { DatePicker(L("Para el"), selection: $due, displayedComponents: .date) }
@@ -127,7 +127,7 @@ struct MemoryView: View {
                         Spacer(); GlassAction(title: "Recordar", symbol: "plus") { store.addMemory(text, companyID: companyID); if store.notice.isEmpty { text = "" } }.disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                     }
                 }.padding(22).frostedSurface(23)
-                Text(L(store.settings.useMemory ? "La memoria se incluye en tus misiones. Los recuerdos de empresa solo se usan en esa empresa." : "La memoria está desactivada. Puedes activarla en Ajustes.")).font(.system(size: 11)).foregroundStyle(.secondary).lineSpacing(4)
+                Text(L(store.settings.useMemory ? "La memoria se incluye en tus misiones. Los recuerdos de un proyecto solo se usan en ese proyecto." : "La memoria está desactivada. Puedes activarla en Ajustes.")).font(.system(size: 11)).foregroundStyle(.secondary).lineSpacing(4)
                 if store.state.memories.isEmpty { WorkspaceEmpty(symbol: "brain", title: "Un poco más de ti", detail: "Guarda cómo te gusta trabajar, tus objetivos o contexto útil. También puedes permitir que recuerde lo que le pidas en Ajustes.") }
                 ForEach(store.state.memories) { entry in
                     VStack(alignment: .leading, spacing: 13) {

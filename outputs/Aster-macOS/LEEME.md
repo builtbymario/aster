@@ -2,6 +2,10 @@
 
 Esta vista previa es nativa para **Apple Silicon e Intel, con macOS 14 o posterior**. Conserva tus personajes, conversaciones, empresas, memoria y preferencias de versiones anteriores. La app está firmada localmente y todavía no está notarizada para distribuirla a otros usuarios. Consulta **INSTALAR.md** antes de trasladarla a otro Mac; Intel se ha compilado, pero no probado en hardware real.
 
+## En desarrollo: proyectos
+
+**Empresas** se convierte en **Proyectos**: una startup, una carrera, un canal, una investigación o algo personal. Cada proyecto tiene **su propio chat con Aster**, **su equipo de agentes** (Auto elige entre ellos en cada mensaje) y su objetivo, contexto, tareas, memoria y misiones. Al crearlo eliges una plantilla (Empresa o startup, Estudios, Contenido y marca, Investigación, Personal u Otro proyecto), que trae el equipo adecuado y las primeras acciones: plan de estudio, ejercicios, calendario de contenidos, estado del arte… y, en las startups, **Lanzar startup**, que pone a trabajar a todos los departamentos y avisa en el chat del proyecto cuando termina. El equipo se puede cambiar al editar el proyecto. Las misiones que Aster lanza desde el chat de un proyecto quedan en ese proyecto. Tus empresas anteriores se conservan como proyectos de tipo startup.
+
 ## En desarrollo: tu IA, OpenAI o Claude
 
 Aster no incluye ninguna clave. Al abrirlo por primera vez, una **bienvenida** de cuatro pasos te presenta a Aster, te pide elegir con qué IA piensa (**Claude**, de Anthropic, u **OpenAI**), comprueba tu clave y te deja elegir el modelo entre los que tu cuenta puede usar; después te pregunta cómo llamarte, el idioma y si quieres Aster en el notch o como mascota flotante, y termina con los atajos y la conexión opcional de Calendario, Notas, Mail y notificaciones. La clave queda en el Llavero de tu Mac y solo se envía a quien la emitió. Puedes cambiar de IA o de modelo cuando quieras en **Ajustes → Conexiones**.

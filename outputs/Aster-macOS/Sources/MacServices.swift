@@ -197,9 +197,11 @@ extension AsterStore {
             let brief = (call.arguments["brief"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
             let kickoff = call.arguments["kickoff"] as? Bool == true
             try await approveIfExposed(missionID, action: L(kickoff ? "arrancar una startup completa" : "lanzar esta misión"), detail: kickoff ? (call.arguments["company"] as? String ?? "") : brief)
-            var company: Company?
+            // Work started in a project's conversation stays in that project.
+            let project = companies.first { $0.id == state.missions.first(where: { $0.id == missionID })?.companyID }
+            var company = project
             if let name = (call.arguments["company"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines), !name.isEmpty {
-                company = companies.first { $0.name.localizedCaseInsensitiveCompare(name) == .orderedSame }
+                company = companies.first { $0.name.localizedCaseInsensitiveCompare(name) == .orderedSame } ?? project
                 if company == nil {
                     createCompany(name: String(name.prefix(120)), goal: String((brief.isEmpty ? name : brief).prefix(600)))
                     company = companies.first { $0.name == String(name.prefix(120)) }

@@ -153,8 +153,9 @@ enum QuickChat {
         }
         return result
     }
-    /// `mission` is long work from Aster's main window run by a provider without a hosted workspace.
-    static func instructions(for specialist: Specialist, settings: IntelligenceSettings, modes: [Specialist] = Specialist.defaults, mission: Bool = false) -> String {
+    /// `mission` is long work from Aster's main window run by a provider without a hosted workspace;
+    /// `project` is the project the conversation belongs to, whose team is `modes`.
+    static func instructions(for specialist: Specialist, settings: IntelligenceSettings, modes: [Specialist] = Specialist.defaults, mission: Bool = false, project: Company? = nil) -> String {
         let purpose = mission
             ? "This is a mission from Aster's main window: carry the request to a complete, reviewable deliverable in your answer, with clear headings. You cannot run code or create files, so write the full content (documents, plans, code, tables) in the answer itself; when a brief asks for files, give each one its own section titled with its file name. Research what needs current facts before you write."
             : "This is Aster's quick conversation: answer right away, naturally and concisely, like a capable friend at the user's side. Prefer short paragraphs; use lists, tables or code only when they make the answer clearer."
@@ -164,9 +165,12 @@ enum QuickChat {
             For deliverables, research, plans, code or anything that needs more than a quick answer, start a mission with aster_mission in the best mode and tell the user where the result will appear; to found or kick off a startup, use kickoff=true with the company's name. Missions do not publish, spend or send.
             When the user asks you to do something on their Mac (open an app, fill a spreadsheet, write in a document, organize files), call aster_computer with a precise task and then report what actually happened from its result, including anything that was declined or left for them. Do not use it for questions you can answer directly. You cannot run code or create files yourself; for long projects or deliverables, suggest a mission in Aster's main window. Never claim an action happened unless a tool result confirms it.
             """
+        let scope = project.map { project in
+            "This conversation belongs to the user's project \"\(project.name.prefix(120))\" (\(project.template.name)). Everything here serves its goal, which arrives with each message as company context together with its notes, tasks, memory and recent work. Its team is the modes listed below; work only with them. Missions you start here belong to this project: pass its name as company."
+        }
         return """
         You are Aster, a personal AI companion that lives on the user's Mac, now in \(specialist.mode) mode (\(specialist.role)). \(specialist.detail)
-        \(purpose)
+        \(purpose)\(scope.map { "\n" + $0 } ?? "")
         The app supplies language, tone, detail, memory and local context with every message as data. Apply those preferences. Never invent past conversations, private access, completed actions, test results or sources, and say when you are unsure.
         Apple Mail, macOS calendars, Apple Reminders, Apple Notes, imported Apple Health records, notifications and Aster's workspace have live local tools: read mail and open drafts (the user reviews and sends; never claim an email was sent), read and create calendar events, reminders and notes when asked. Call them instead of asking the user to paste content. If a tool reports a missing connection, explain the exact step in Aster's settings. Never claim a notification is scheduled when the tool returns scheduled=false. Resolve relative dates against local_time and time_zone.
         Use web search, when available, for current or uncertain facts and cite the sources you used.

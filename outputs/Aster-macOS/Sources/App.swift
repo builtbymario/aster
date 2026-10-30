@@ -16,7 +16,12 @@ import SwiftUI
         }
         PortableSetup.importPreparedKey()
         AsterLanguage.migrateStoredChoice()
+        #if DEBUG
+        // Lets a development build run on a separate workspace, leaving the real one untouched.
+        store = AsterStore(directory: ProcessInfo.processInfo.environment["ASTER_DATA_DIR"].map { URL(fileURLWithPath: $0, isDirectory: true) })
+        #else
         store = AsterStore()
+        #endif
         _ = store.remote
         if store.needsOnboarding { store.onboarding = true }
         else if !(store.settings.usesClaude ? AIProvider.anthropic : .openai).hasKey { store.page = "Conexiones" }

@@ -12,7 +12,7 @@ extension AsterStore {
             var imported = try JSONDecoder().decode(SavedState.self, from: Data(contentsOf: url))
             guard !imported.specialists.isEmpty, Set(imported.missions.map(\.id)).count == imported.missions.count else { throw AsterError.message("La copia tiene datos incompletos o conversaciones duplicadas.") }
             let alert = NSAlert(); alert.messageText = "Restaurar esta copia de Aster"
-            alert.informativeText = "Contiene \(imported.missions.count) conversaciones y \(imported.companies.count) empresas. Sustituirá los datos actuales; se guardará una copia antes de hacerlo. Las conexiones y rutinas se activan de nuevo en este Mac."
+            alert.informativeText = "Contiene \(imported.missions.count) conversaciones y \(imported.companies.count) proyectos. Sustituirá los datos actuales; se guardará una copia antes de hacerlo. Las conexiones y rutinas se activan de nuevo en este Mac."
             alert.addButton(withTitle: "Restaurar"); alert.addButton(withTitle: "Cancelar")
             guard alert.runModal() == .alertFirstButtonReturn else { return }
             let directory = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("Aster/Backups")

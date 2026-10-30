@@ -15,19 +15,16 @@ struct MainView: View {
     @Namespace private var agentNamespace
     @State private var draft = ""
     @State private var customizing = false
-    @State private var addingCompany = false
-    @State private var editingCompany: Company?
     @State private var renamingMission: Mission?
     @State private var missionQuery = ""
     @State private var showArchived = false
-    @State private var companyFilter: UUID?
     @State private var messageViewport: CGFloat = 600
     @State private var nearBottom = true
     @State private var showNotice = false
     @State private var choosingAppearance = false
     @FocusState private var composerFocused: Bool
     var showCompanion: () -> Void
-    let pages = [("Personajes", "sparkles"), ("Empresas", "building.2"), ("Actividad", "waveform.path"), ("Misiones", "square.stack.3d.up"), ("Tareas", "checklist"), ("Ordenador", "cursorarrow.motionlines"), ("Memoria", "brain"), ("Bandeja", "tray"), ("Conexiones", "point.3.connected.trianglepath.dotted")]
+    let pages = [("Personajes", "sparkles"), ("Proyectos", "folder"), ("Actividad", "waveform.path"), ("Misiones", "square.stack.3d.up"), ("Tareas", "checklist"), ("Ordenador", "cursorarrow.motionlines"), ("Memoria", "brain"), ("Bandeja", "tray"), ("Conexiones", "point.3.connected.trianglepath.dotted")]
     var body: some View {
         HStack(spacing: 18) {
             sidebar
@@ -37,7 +34,7 @@ struct MainView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .id(store.page)
                     .transition(reduceMotion ? .identity : .opacity.combined(with: .offset(y: 8)))
-                if !["Conexiones", "Memoria", "Tareas", "Ordenador", "Actividad"].contains(store.page) { composer.transition(.opacity.combined(with: .move(edge: .bottom))) }
+                if !["Conexiones", "Memoria", "Tareas", "Ordenador", "Actividad", "Proyectos"].contains(store.page) { composer.transition(.opacity.combined(with: .move(edge: .bottom))) }
             }.frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .padding(14).padding(.top, 10)
@@ -49,8 +46,6 @@ struct MainView: View {
         .environment(\.locale, Locale(identifier: language))
         .animation(AsterMotion.spring(reduceMotion), value: store.page)
         .sheet(isPresented: $customizing) { CustomizeView(original: store.agent) { store.updateAgent($0) } }
-        .sheet(isPresented: $addingCompany) { CompanyForm { store.createCompany(name: $0, goal: $1, notes: $2) } }
-        .sheet(item: $editingCompany) { company in CompanyForm(original: company) { name, goal, notes in var edited = company; edited.name = name; edited.goal = goal; edited.notes = notes; store.updateCompany(edited) } }
         .sheet(item: $renamingMission) { RenameMissionView(mission: $0) }
         .background(Button(L("")) { composerFocused = true }.keyboardShortcut("l", modifiers: .command).hidden())
         .onChange(of: store.notice) { _, new in if !new.isEmpty { showNotice = true } }
@@ -146,7 +141,7 @@ struct MainView: View {
     }
     @ViewBuilder private var pageContent: some View {
         switch store.page {
-        case "Empresas": companies
+        case "Proyectos": ProjectsView()
         case "Misiones": missions
         case "Tareas": TaskBoardView()
         case "Actividad": ActivityWorkspaceView()
@@ -256,67 +251,15 @@ struct MainView: View {
     private func starter(_ title: String, symbol: String, text: String) -> some View {
         Button { draft = L(text); composerFocused = true } label: { HStack(spacing: 7) { Image(systemName: symbol).font(.system(size: 10)); Text(L(title)).font(.system(size: 10, weight: .medium)).lineLimit(1); Spacer(minLength: 1); Image(systemName: "arrow.up.left").font(.system(size: 8)) }.padding(12).frame(maxWidth: .infinity).liquidSurface(16, interactive: true) }.buttonStyle(FluidButtonStyle(lift: 1))
     }
-    private var companies: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                HStack {
-                    VStack(alignment: .leading, spacing: 8) { Text(L("De idea a empresa.")).font(.system(size: 31, weight: .medium)); Text(L("Un objetivo compartido para todo tu equipo.")).font(.system(size: 12)).foregroundStyle(muted) }
-                    Spacer(); Button(L("Nueva empresa")) { addingCompany = true }.glassControl(prominent: true).tint(.accentColor)
-                }
-                if store.companies.isEmpty {
-                    empty("building.2", title: "Aquí empieza tu próxima empresa", detail: "Añade el nombre y el objetivo. Aster podrá preparar la estrategia, el marketing y el desarrollo alrededor de ellos.")
-                }
-                ForEach(store.companies) { company in
-                    VStack(alignment: .leading, spacing: 14) {
-                        HStack {
-                            Text(company.name).font(.system(size: 22, weight: .semibold)); Spacer()
-                            GlassIconButton(symbol: "pencil", title: "Editar empresa") { editingCompany = company }
-                            Menu { Button(L("Ver sus misiones")) { companyFilter = company.id; store.page = "Misiones" }; Button(L("Archivar empresa")) { store.archiveCompany(company.id) } } label: { Image(systemName: "ellipsis").font(.system(size: 13)).frame(width: 32, height: 32) }.menuStyle(.borderlessButton).frame(width: 32)
-                        }
-                        Text(company.goal).font(.system(size: 13)).foregroundStyle(muted).textSelection(.enabled)
-                        if !company.notes.isEmpty { DisclosureGroup(L("Contexto de la empresa")) { Text(company.notes).font(.system(size: 12)).foregroundStyle(muted).textSelection(.enabled).padding(.top, 8) }.font(.system(size: 11)) }
-                        HStack(spacing: 12) {
-                            Label(LF("%d misiones", store.state.missions.filter { $0.companyID == company.id }.count), systemImage: "bubble.left.and.bubble.right")
-                            Label(LF("%d tareas pendientes", store.state.tasks.filter { $0.companyID == company.id && !$0.done }.count), systemImage: "checklist")
-                        }.font(.system(size: 10)).foregroundStyle(muted)
-                        Button { store.launchStartup(company.id) } label: {
-                            HStack(spacing: 10) {
-                                Image(systemName: "paperplane.fill").font(.system(size: 13, weight: .semibold))
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(L("Lanzar startup")).font(.system(size: 13, weight: .semibold))
-                                    Text(L("Todos los departamentos en paralelo: estrategia, mercado, producto, growth, finanzas y legal.")).font(.system(size: 11)).opacity(0.85)
-                                }
-                                Spacer(); Image(systemName: "arrow.right").font(.system(size: 11, weight: .semibold))
-                            }.padding(.horizontal, 14).padding(.vertical, 11).foregroundStyle(Color.asterOnAccent)
-                                .background(Color.asterAccent, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-                        }.buttonStyle(FluidButtonStyle()).disabled(!store.hasCapacity)
-                        HStack(spacing: 10) {
-                            companyAction("Plan de negocio", agent: "strategy", company: company, input: "Prepara un plan de negocio útil: propuesta de valor, mercado, riesgos, costes, supuestos y próximos pasos.")
-                            companyAction("Marketing", agent: "growth", company: company, input: "Prepara una estrategia de marketing y un primer calendario de contenidos con objetivos medibles.")
-                            companyAction("Web y producto", agent: "builder", company: company, input: "Construye una primera web para esta empresa en tu entorno, guarda los archivos en /workspace/outputs, comprueba que funciona y explica cómo revisarla. No publiques nada.")
-                            companyAction("Coordinar equipo", agent: "director", company: company, input: "Coordina especialistas de negocio, marketing y desarrollo para preparar un plan de lanzamiento coherente y revisable.")
-                        }.disabled(!store.hasCapacity)
-                    }.padding(24).frame(maxWidth: .infinity, alignment: .leading).frostedSurface(24)
-                }
-                if store.state.companies.contains(where: { $0.archived == true }) {
-                    DisclosureGroup(L("Empresas archivadas")) { ForEach(store.state.companies.filter { $0.archived == true }) { company in HStack { Text(company.name); Spacer(); Button(L("Restaurar")) { store.archiveCompany(company.id, archived: false) } }.font(.system(size: 12)).padding(.vertical, 6) } }
-                }
-                Text(L("La creación aquí organiza un proyecto empresarial. La constitución legal, la publicación y los gastos requieren pasos posteriores.")).font(.system(size: 10)).foregroundStyle(muted)
-            }.padding(30)
-        }
-    }
-    private func companyAction(_ title: String, agent: String, company: Company, input: String) -> some View {
-        Button(L(title)) { store.select(agent); store.run(input, companyID: company.id, fresh: true) }.font(.system(size: 10)).glassControl()
-    }
     private var filteredMissions: [Mission] {
-        store.state.missions.filter { (showArchived ? $0.archived == true : $0.archived != true) && (companyFilter == nil || $0.companyID == companyFilter) && (missionQuery.isEmpty || $0.title.localizedCaseInsensitiveContains(missionQuery) || $0.messages.contains { $0.text.localizedCaseInsensitiveContains(missionQuery) }) }.sorted { a, b in if (a.pinned ?? false) != (b.pinned ?? false) { return a.pinned == true }; return a.updated > b.updated }
+        store.state.missions.filter { (showArchived ? $0.archived == true : $0.archived != true) && (store.projectFilter == nil || $0.companyID == store.projectFilter) && (missionQuery.isEmpty || $0.title.localizedCaseInsensitiveContains(missionQuery) || $0.messages.contains { $0.text.localizedCaseInsensitiveContains(missionQuery) }) }.sorted { a, b in if (a.pinned ?? false) != (b.pinned ?? false) { return a.pinned == true }; return a.updated > b.updated }
     }
     private var missions: some View {
         HStack(spacing: 0) {
             VStack(alignment: .leading, spacing: 12) {
                 Button { store.selectedMission = nil; draft = "" } label: { Label(L("Nueva misión"), systemImage: "plus").font(.system(size: 11)) }.glassControl()
                 TextField(L("Buscar misiones…"), text: $missionQuery).textFieldStyle(.roundedBorder).font(.system(size: 11))
-                Picker(L("Empresa"), selection: $companyFilter) { Text(L("Todas")).tag(nil as UUID?); ForEach(store.companies) { Text($0.name).tag(Optional($0.id)) } }.labelsHidden().font(.system(size: 10))
+                Picker(L("Proyecto"), selection: $store.projectFilter) { Text(L("Todas")).tag(nil as UUID?); ForEach(store.companies) { Text($0.name).tag(Optional($0.id)) } }.labelsHidden().font(.system(size: 10))
                 Toggle(L("Archivadas"), isOn: $showArchived).toggleStyle(.switch).font(.system(size: 10))
                 ScrollView {
                     VStack(spacing: 8) {
@@ -450,35 +393,6 @@ struct CustomizeView: View {
         }.padding(26).frame(width: 500).background(AmbientBackdrop(tint: Color.asterAccent)).foregroundStyle(.primary)
             .animation(AsterMotion.spring(reduceMotion), value: agent.style.form)
             .animation(AsterMotion.spring(reduceMotion), value: agent.style.tint)
-    }
-}
-
-struct CompanyForm: View {
-    @Environment(\.dismiss) private var dismiss
-    @State var name = ""
-    @State var goal = ""
-    @State var notes = ""
-    private var editing = false
-    let save: (String, String, String) -> Void
-    init(original: Company? = nil, save: @escaping (String, String, String) -> Void) {
-        _name = State(initialValue: original?.name ?? ""); _goal = State(initialValue: original?.goal ?? ""); _notes = State(initialValue: original?.notes ?? ""); editing = original != nil; self.save = save
-    }
-    var body: some View {
-        VStack(alignment: .leading, spacing: 22) {
-            HStack {
-                VStack(alignment: .leading, spacing: 6) { Text(L("Dale una dirección.")).font(.system(size: 27, weight: .semibold)).tracking(-0.7); Text(L("Tu idea merece un buen comienzo.")).font(.system(size: 12)).foregroundStyle(muted) }
-                Spacer(); GlassIconButton(symbol: "xmark", title: "Cerrar formulario de empresa") { dismiss() }
-            }
-            VStack(alignment: .leading, spacing: 15) {
-                Text(L("Nombre de la empresa")).font(.system(size: 12, weight: .medium))
-                TextField(L("Tu empresa"), text: $name).textFieldStyle(.plain).padding(12).background(.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 11))
-                Text(L("¿Qué quieres conseguir?")).font(.system(size: 12, weight: .medium)).padding(.top, 3)
-                TextEditor(text: $goal).font(.system(size: 13)).scrollContentBackground(.hidden).frame(height: 90).padding(10).background(.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 11))
-                Text(L("Contexto, audiencia y recursos")).font(.system(size: 12, weight: .medium))
-                TextEditor(text: $notes).font(.system(size: 12)).scrollContentBackground(.hidden).frame(height: 85).padding(10).background(.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 11))
-            }.padding(20).frostedSurface(24)
-            HStack { Button(L("Cancelar")) { dismiss() }.buttonStyle(FluidButtonStyle()).font(.system(size: 12)).foregroundStyle(muted); Spacer(); GlassAction(title: editing ? "Guardar empresa" : "Crear espacio", symbol: editing ? "checkmark" : "plus", prominent: true) { save(name, goal, notes); dismiss() }.disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || goal.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) }
-        }.padding(26).frame(width: 470).background(AmbientBackdrop(tint: .purple)).foregroundStyle(.primary)
     }
 }
 

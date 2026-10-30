@@ -55,12 +55,67 @@ extension Specialist {
     /// Modes in the order the interface shows them.
     static let modeOrder = ["director", "study", "builder", "strategy", "research", "finance", "growth", "content", "personal"]
 }
+/// A project: a company, a degree, a channel or anything else the user is working towards. It
+/// keeps the stored name `Company` so workspaces saved before projects existed still load.
 struct Company: Identifiable, Codable {
     var id = UUID()
     var name: String
     var goal: String
     var notes: String = ""
     var archived: Bool?
+    /// The template it was created from; nil for companies made before projects, which are startups.
+    var kind: String?
+    /// The modes that work on this project; nil uses the template's team.
+    var modes: [String]?
+    /// The project's own conversation with Aster.
+    var chatID: UUID?
+    var template: ProjectTemplate { ProjectTemplate.all.first { $0.id == kind } ?? ProjectTemplate.all[0] }
+    var team: [String] { (modes ?? template.modes).filter { Specialist.modeOrder.contains($0) && $0 != "director" } }
+}
+
+/// A starting point for a project: who works on it and the first things worth asking.
+struct ProjectTemplate: Identifiable, Equatable {
+    struct Action: Equatable { var title: String; var symbol: String; var prompt: String; var kickoff = false }
+    var id: String
+    var name: String
+    var symbol: String
+    var detail: String
+    var goalHint: String
+    var modes: [String]
+    var actions: [Action]
+    static let all: [ProjectTemplate] = [
+        .init(id: "startup", name: "Empresa o startup", symbol: "building.2", detail: "De la idea al lanzamiento: estrategia, producto, growth y finanzas.", goalHint: "Una app de apuntes compartidos para estudiantes universitarios",
+              modes: ["strategy", "research", "builder", "growth", "finance", "content"],
+              actions: [.init(title: "Lanzar startup", symbol: "paperplane", prompt: "", kickoff: true),
+                        .init(title: "Plan de negocio", symbol: "doc.text", prompt: "Prepara un plan de negocio útil: propuesta de valor, mercado, riesgos, costes, supuestos y próximos pasos."),
+                        .init(title: "Marketing", symbol: "megaphone", prompt: "Prepara una estrategia de marketing y un primer calendario de contenidos con objetivos medibles."),
+                        .init(title: "Web y producto", symbol: "hammer", prompt: "Diseña la primera versión del producto y su web: funciones clave, páginas y el texto de la portada. No publiques nada.")]),
+        .init(id: "study", name: "Estudios", symbol: "graduationcap", detail: "Una carrera, una asignatura o un examen: plan, explicaciones y práctica.", goalHint: "Aprobar Cálculo II y Física de primero de Ingeniería Industrial",
+              modes: ["study", "builder", "research"],
+              actions: [.init(title: "Plan de estudio", symbol: "calendar", prompt: "Prepara un plan de estudio semanal para este proyecto: objetivos, temas por día, repasos y cómo comprobar que avanzo."),
+                        .init(title: "Ejercicios", symbol: "pencil.and.list.clipboard", prompt: "Hazme ejercicios de práctica del tema que toca, de menos a más difícil, y corrígemelos cuando te responda."),
+                        .init(title: "Explícamelo", symbol: "lightbulb", prompt: "Explícame paso a paso el concepto que más me está costando de este proyecto, con un ejemplo resuelto."),
+                        .init(title: "Examen de prueba", symbol: "checklist", prompt: "Hazme un examen de prueba realista de este proyecto con su solución al final.")]),
+        .init(id: "content", name: "Contenido y marca", symbol: "megaphone", detail: "Un canal, una newsletter o una marca personal que crece con constancia.", goalHint: "Un canal de YouTube de divulgación tecnológica con un vídeo a la semana",
+              modes: ["content", "growth", "research"],
+              actions: [.init(title: "Calendario", symbol: "calendar", prompt: "Prepara un calendario de contenidos de cuatro semanas con temas, formatos, ganchos y fechas."),
+                        .init(title: "Ideas", symbol: "sparkles", prompt: "Dame diez ideas de piezas para este proyecto, cada una con su gancho y por qué funcionaría con esta audiencia."),
+                        .init(title: "Audiencia", symbol: "person.2", prompt: "Analiza la audiencia de este proyecto: quién es, qué busca, dónde está y cómo llegar a ella.")]),
+        .init(id: "research", name: "Investigación", symbol: "magnifyingglass", detail: "Una pregunta que responder con fuentes, datos y conclusiones claras.", goalHint: "Entender el mercado europeo de baterías para bicicletas eléctricas",
+              modes: ["research", "finance", "content"],
+              actions: [.init(title: "Estado del arte", symbol: "books.vertical", prompt: "Investiga el estado actual de este tema con fuentes citadas y resume lo que se sabe, lo que se discute y lo que falta."),
+                        .init(title: "Preguntas clave", symbol: "questionmark.bubble", prompt: "Define las preguntas clave de esta investigación y cómo responder a cada una."),
+                        .init(title: "Informe", symbol: "doc.richtext", prompt: "Escribe un informe de esta investigación con resumen, hallazgos con fuentes, datos y recomendaciones.")]),
+        .init(id: "personal", name: "Personal", symbol: "person.crop.circle", detail: "Tus finanzas, tu salud, un viaje o un hábito: organizado y al día.", goalHint: "Ahorrar 3.000 € este año sin dejar de viajar",
+              modes: ["personal", "finance", "study"],
+              actions: [.init(title: "Plan semanal", symbol: "calendar", prompt: "Organízame la semana para avanzar en este proyecto, con tiempos realistas y recordatorios."),
+                        .init(title: "Presupuesto", symbol: "eurosign", prompt: "Prepara un presupuesto sencillo para este proyecto con ingresos, gastos y lo que puedo ajustar."),
+                        .init(title: "Hábitos", symbol: "repeat", prompt: "Propón tres hábitos pequeños que me acerquen al objetivo de este proyecto y cómo medirlos.")]),
+        .init(id: "other", name: "Otro proyecto", symbol: "folder", detail: "Cualquier otra cosa: eliges tú quién trabaja en él.", goalHint: "Organizar la boda de mi hermana en junio",
+              modes: ["research", "personal", "content"],
+              actions: [.init(title: "Plan", symbol: "list.bullet.clipboard", prompt: "Prepara un plan para este proyecto con fases, tareas, fechas y riesgos."),
+                        .init(title: "Próximos pasos", symbol: "arrow.turn.down.right", prompt: "¿Cuáles son los tres próximos pasos más útiles para este proyecto? Proponlos concretos.")])
+    ]
 }
 struct Message: Identifiable, Codable {
     var id = UUID()

@@ -112,7 +112,7 @@ import Combine
                 guard store.connectionReady else { throw RemoteError.message("Conecta tu IA (OpenAI o Claude) en el Mac antes de iniciar una conversación.") }
                 guard let agentID = request.agentID, store.state.specialists.contains(where: { $0.id == agentID }) else { throw RemoteError.message("Ese agente ya no está disponible.") }
                 if let id = request.missionID { guard store.state.missions.contains(where: { $0.id == id && $0.specialistID == agentID }) else { throw RemoteError.message("La conversación no corresponde a ese agente.") } }
-                if let id = request.companyID { guard store.companies.contains(where: { $0.id == id }) else { throw RemoteError.message("Esa empresa ya no está disponible.") } }
+                if let id = request.companyID { guard store.companies.contains(where: { $0.id == id }) else { throw RemoteError.message("Ese proyecto ya no está disponible.") } }
                 guard store.run(request.text!, companyID: request.companyID, fresh: request.missionID == nil, missionID: request.missionID, specialistID: agentID, background: true) else { throw RemoteError.message("El agente está ocupado o la sesión necesita recuperarse en el Mac.") }
                 receipt.missionID = request.missionID ?? store.state.missions.first?.id; subscribed = receipt.missionID
             case .stopMission:
