@@ -4,7 +4,8 @@ import SwiftUI
 /// Where Aster's island sits on a screen and how large each of its states is.
 /// On a MacBook it matches the camera notch; elsewhere it hangs from the top center like one.
 struct IslandLayout: Equatable {
-    static let content = CGSize(width: 420, height: 452)
+    /// The largest the open island gets below the notch; it is usually much smaller.
+    static let content = CGSize(width: 440, height: 420)
     static let ear: CGFloat = 48
     var screen: CGRect
     var notch: CGSize
@@ -68,6 +69,13 @@ struct IslandShape: Shape {
     private weak var desktop: DesktopCompanions?
     private var monitors: [Any] = []
     private var closeTask: Task<Void, Never>?
+    /// The size the island is drawn at right now, reported by its view; hit tests use it.
+    var visibleSize = CGSize.zero
+    /// Where the island is on screen now, slightly enlarged so the edge is forgiving.
+    var visibleFrame: CGRect {
+        let size = visibleSize == .zero ? layout.expanded : visibleSize
+        return CGRect(x: layout.screen.midX - size.width / 2, y: layout.screen.maxY - size.height, width: size.width, height: size.height).insetBy(dx: -8, dy: -8)
+    }
     /// After closing, the notch reopens the island only once the pointer has left it.
     private var armed = true
 
@@ -122,13 +130,13 @@ struct IslandShape: Shape {
         case .resting:
             let inside = layout.hotZone.contains(pointer)
             if inside && armed { desktop.showChat(desktop.currentMode) } else if !inside { armed = true }
-        case .open: if layout.panel.contains(pointer) { closeTask?.cancel() } else { scheduleClose() }
+        case .open: if visibleFrame.contains(pointer) { closeTask?.cancel() } else { scheduleClose() }
         case .hidden: break
         }
     }
     /// A click anywhere else dismisses the island, unless Aster is listening.
     private func clickedOutside() {
-        guard phase == .open, !layout.panel.contains(NSEvent.mouseLocation), !store.listener.active else { return }
+        guard phase == .open, !visibleFrame.contains(NSEvent.mouseLocation), !store.listener.active else { return }
         desktop?.closeChat()
     }
     /// Leaving the island closes it after a moment, unless it was pinned, is listening or holds a draft.
@@ -137,7 +145,7 @@ struct IslandShape: Shape {
         closeTask = Task { [weak self] in
             do { try await Task.sleep(for: .milliseconds(650)) } catch { return }
             guard let self else { return }; self.closeTask = nil
-            guard let desktop = self.desktop, self.phase == .open, !self.layout.panel.contains(NSEvent.mouseLocation),
+            guard let desktop = self.desktop, self.phase == .open, !self.visibleFrame.contains(NSEvent.mouseLocation),
                   !desktop.pinned, !self.store.listener.active,
                   (desktop.drafts[desktop.currentMode] ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
             desktop.closeChat()
@@ -158,29 +166,35 @@ struct IslandView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var finished = false
     @State private var finishTask: Task<Void, Never>?
+    @State private var contentHeight: CGFloat = 56
     private var style: AvatarStyle { store.state.specialists.first { $0.id == "director" }?.style ?? AvatarStyle() }
     private var mood: AvatarMood { store.mood() }
     private var live: Bool { island.phase == .resting && (mood != .calm || finished) }
     private var size: CGSize {
         switch island.phase {
-        case .open: return island.layout.expanded
+        case .open: return CGSize(width: island.layout.expanded.width, height: min(island.layout.expanded.height, island.layout.notch.height + contentHeight))
         case .resting: return live ? island.layout.compact : island.layout.notch
         case .hidden: return island.layout.notch
         }
     }
-    private var motion: Animation { reduceMotion ? .easeOut(duration: 0.16) : .spring(response: 0.44, dampingFraction: 0.78) }
+    private var motion: Animation { reduceMotion ? .easeOut(duration: 0.16) : .spring(response: 0.42, dampingFraction: 0.8) }
     var body: some View {
         let open = island.phase == .open
-        let shape = IslandShape(topRadius: open ? 14 : 6, bottomRadius: open ? 30 : island.layout.notch.height * 0.42)
+        let shape = IslandShape(topRadius: open ? 12 : 6, bottomRadius: open ? 28 : island.layout.notch.height * 0.42)
         ZStack(alignment: .top) {
             shape.fill(Color.black)
                 .shadow(color: Color.asterRing.opacity(mood == .listening ? 0.55 : 0), radius: 18, y: 4)
-                .shadow(color: .black.opacity(open ? 0.35 : 0), radius: 24, y: 10)
+                .shadow(color: .black.opacity(open ? 0.3 : 0), radius: 22, y: 10)
             if open {
                 VStack(spacing: 0) {
                     Color.clear.frame(height: island.layout.notch.height)
-                    DesktopChatView(desktop: desktop, chrome: false)
-                }.padding(.horizontal, 14).padding(.bottom, 8).clipShape(shape)
+                    IslandChatView(desktop: desktop)
+                        .padding(.horizontal, 20).padding(.top, 8).padding(.bottom, 12)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .background(GeometryReader { Color.clear.preference(key: IslandContentHeightKey.self, value: $0.size.height) })
+                    Spacer(minLength: 0)
+                }.frame(width: size.width, height: size.height, alignment: .top).clipShape(shape)
+                    .onPreferenceChange(IslandContentHeightKey.self) { height in if abs(height - contentHeight) > 0.5 { contentHeight = height } }
                     .transition(.asymmetric(insertion: .modifier(active: BlurFade(amount: 12), identity: BlurFade(amount: 0)).animation(motion.delay(0.08)),
                                             removal: .opacity.animation(.easeOut(duration: 0.12))))
             } else if live {
@@ -192,7 +206,9 @@ struct IslandView: View {
         .animation(motion, value: island.phase)
         .animation(motion, value: live)
         .animation(motion, value: mood)
+        .animation(reduceMotion ? nil : .smooth(duration: 0.22), value: contentHeight)
         .environment(\.colorScheme, .dark)
+        .onChange(of: size, initial: true) { _, value in island.visibleSize = value }
         .onChange(of: mood) { old, new in
             guard old == .thinking, new == .calm else { return }
             finished = true; finishTask?.cancel()
@@ -233,7 +249,7 @@ private struct LiveBars: View {
 }
 
 /// Three dots that pulse in turn while Aster thinks.
-private struct ThinkingDots: View {
+struct ThinkingDots: View {
     var body: some View {
         TimelineView(.animation(minimumInterval: 1.0 / 30)) { timeline in
             let time = timeline.date.timeIntervalSinceReferenceDate

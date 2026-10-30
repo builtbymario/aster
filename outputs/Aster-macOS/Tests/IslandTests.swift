@@ -12,7 +12,7 @@ final class IslandTests: XCTestCase {
         XCTAssertTrue(macBook.hasNotch)
         XCTAssertEqual(macBook.notch, CGSize(width: 179, height: 32))
         XCTAssertEqual(macBook.compact, CGSize(width: 179 + 96, height: 32), "The live activity adds an ear on each side")
-        XCTAssertEqual(macBook.expanded, CGSize(width: 420, height: 32 + 452))
+        XCTAssertEqual(macBook.expanded, CGSize(width: 440, height: 32 + 420), "The most it opens; usually far less")
         XCTAssertEqual(macBook.panel.midX, 735, "The island hangs from the top center")
         XCTAssertEqual(macBook.panel.maxY, 956)
         XCTAssertTrue(macBook.hotZone.contains(CGPoint(x: 735, y: 955)), "Pointing at the notch opens the island")
