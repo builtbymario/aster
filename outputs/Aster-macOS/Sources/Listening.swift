@@ -144,7 +144,7 @@ final class AppleSpeechBackend: SpeechBackend {
     /// The user's own region when it speaks that language, otherwise a common one.
     nonisolated static func locale(for language: String, current: Locale = .current) -> Locale {
         if current.language.languageCode?.identifier == language { return current }
-        let regions = ["es": "ES", "en": "US", "ca": "ES", "fr": "FR", "de": "DE", "it": "IT", "pt": "PT", "ja": "JP", "zh": "CN"]
+        let regions = ["es": "ES", "en": "US", "fr": "FR", "de": "DE", "it": "IT", "pt": "PT", "ja": "JP", "zh": "CN"]
         return Locale(identifier: regions[language].map { language + "-" + $0 } ?? language)
     }
     nonisolated static func requestPermissions() async throws {

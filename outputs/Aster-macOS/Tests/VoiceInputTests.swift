@@ -118,7 +118,7 @@ final class VoiceInputTests: XCTestCase {
     func testDictationLanguageFollowsTheUsersRegion() {
         XCTAssertEqual(VoiceInput.locale(for: "es", current: Locale(identifier: "es_MX")).identifier, "es_MX")
         XCTAssertEqual(VoiceInput.locale(for: "en", current: Locale(identifier: "es_MX")).identifier, "en-US")
-        XCTAssertEqual(VoiceInput.locale(for: "ca", current: Locale(identifier: "en_US")).identifier, "ca-ES")
+        XCTAssertEqual(VoiceInput.locale(for: "fr", current: Locale(identifier: "en_US")).identifier, "fr-FR")
         XCTAssertTrue(VoiceInput.isQuiet(NSError(domain: "kAFAssistantErrorDomain", code: 216)))
         XCTAssertFalse(VoiceInput.isQuiet(NSError(domain: "kAFAssistantErrorDomain", code: 1101)))
     }

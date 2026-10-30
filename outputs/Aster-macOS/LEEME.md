@@ -106,7 +106,7 @@ La primera transición desde la firma antigua puede requerir esta renovación. L
 - **Ordenador**: pantalla en directo, movimientos de cursor, clics, escritura, atajos, desplazamiento y apertura de apps, con explicación visible de cada paso.
 - **Voces**: trece voces naturales de OpenAI, elección por personaje y voces de macOS. La voz detecta el idioma del texto; las respuestas pueden seguir el idioma de tu mensaje.
 - Tareas separadas en **Aster**, **Apple** y **Avisos**.
-- Interfaz en español, inglés y catalán. La conversación puede usar otros idiomas.
+- Interfaz en español e inglés. La conversación puede usar otros idiomas.
 
 En macOS 26 o posterior los controles usan Liquid Glass nativo. En sistemas anteriores usan los materiales compatibles del sistema. Reducir movimiento y Reducir transparencia se respetan automáticamente.
 
@@ -209,7 +209,7 @@ Los datos se guardan de forma atómica en `~/Library/Application Support/Aster/s
 - La prueba real corrigió una configuración inválida que impedía iniciar conversaciones con los especialistas individuales. La suite de API comprueba ahora los seis personajes y el coordinador con delegación desactivada. También se conserva el foco del chat fijado al volver a activar Aster y se evitan guardados de borradores vacíos sin cambios.
 - Compilación nativa optimizada y firma local correctas. En 0.4.2 se revisó el logo real en Acerca de Aster, las opciones de ordenar, ocultar y recuperar el equipo, y las seis posiciones de 94 × 96 puntos conservadas al reabrir la app. Ordenador siguió reconociendo sus permisos tras la actualización. La herramienta de comprobación no pudo completar de forma fiable un arrastre real sobre las ventanas flotantes; esa interacción no está certificada por las pruebas automatizadas.
 - Siete suites: disposición del escritorio, protocolo de eventos, continuidad y datos, API y recuperación, control visual y cancelación, conexiones/avisos/Salud, y minichat. La prueba de disposición comprueba seis compañeros sin solaparse, pantallas pequeñas, coordenadas negativas de monitores, conservación de posiciones manuales y recuperación al desconectar un monitor. También cubre el espacio de la flecha y la colocación del minichat sin cubrir el compañero. La prueba de minichat verifica la separación de agentes, borradores e historial, la persistencia, el aislamiento de la ventana grande y sus adjuntos, la recuperación y los errores de conexión sin usar la red.
-- Misión real de OpenAI completada con dos especialistas, respuesta en catalán, archivo adjunto leído y comprobado, tarea local guardada y archivo de salida descargado y verificado. Sesión de prueba eliminada.
+- Misión real de OpenAI completada con dos especialistas, respuesta en otro idioma, archivo adjunto leído y comprobado, tarea local guardada y archivo de salida descargado y verificado. Sesión de prueba eliminada.
 - Voz natural Marin generada y MP3 decodificado correctamente: muestra de 11,16 segundos incluida junto a la app.
 - Modelo real `gpt-6-luna` identificó el botón correcto de una imagen de prueba usando el mismo esquema de acciones del control del Mac.
 - Revisión visual de la interfaz nueva y de la página Ordenador. Después de renovar las entradas antiguas, la app reconoció Pantalla y Accesibilidad y abrió la vista en directo. Atlas completó una tarea real de TextEdit, reemplazó dos líneas, guardó el mismo archivo y comprobó la pantalla. La inspección independiente del archivo guardado confirmó el contenido exacto. Después de una actualización, ambos permisos permanecieron concedidos.

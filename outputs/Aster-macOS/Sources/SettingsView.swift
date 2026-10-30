@@ -49,7 +49,7 @@ struct SettingsView: View {
                 Picker(L("Idioma de la interfaz"), selection: $language) { ForEach(AsterLanguage.allCases, id: \.rawValue) { Text($0.name).tag($0.rawValue) } }
                 Picker(L("Idioma de las respuestas"), selection: option(\.responseLanguage)) {
                     Text(L("El de mi mensaje")).tag("auto")
-                    ForEach([("es", "Español"), ("en", "English"), ("ca", "Català"), ("fr", "Français"), ("de", "Deutsch"), ("it", "Italiano"), ("pt", "Português"), ("ja", "日本語"), ("zh", "中文")], id: \.0) { Text($0.1).tag($0.0) }
+                    ForEach([("es", "Español"), ("en", "English"), ("fr", "Français"), ("de", "Deutsch"), ("it", "Italiano"), ("pt", "Português"), ("ja", "日本語"), ("zh", "中文")], id: \.0) { Text($0.1).tag($0.0) }
                 }
                 Picker(L("Tono"), selection: option(\.tone)) { Text(L("Cercano")).tag("warm"); Text(L("Directo")).tag("direct"); Text(L("Profesional")).tag("professional"); Text(L("Creativo")).tag("creative") }
                 Picker(L("Detalle"), selection: option(\.detail)) { Text(L("Breve")).tag("brief"); Text(L("Equilibrado")).tag("balanced"); Text(L("Exhaustivo")).tag("detailed") }

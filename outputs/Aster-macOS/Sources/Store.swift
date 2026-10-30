@@ -108,6 +108,8 @@ import Combine
             state.missions[index].status = "Por recuperar"
             state.missions[index].error = "La app se cerró durante la misión. Recupera la sesión para ver su estado actual."
         }
+        // Catalan is no longer offered; answers follow the user's message instead.
+        if state.preferences.intelligence?.responseLanguage == "ca" { state.preferences.intelligence?.responseLanguage = "auto" }
         if !state.specialists.contains(where: { $0.id == "study" }) { state.specialists.append(Specialist.defaults.first { $0.id == "study" }!) }
         if state.preferences.watchReminders == true { remindersStatus = EKEventStore.authorizationStatus(for: .reminder) == .fullAccess ? "Conectado" : "Permiso pendiente" }
         if state.preferences.watchCalendar { calendarStatus = EKEventStore.authorizationStatus(for: .event) == .fullAccess ? "Conectado" : "Permiso pendiente" }

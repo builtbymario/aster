@@ -15,6 +15,7 @@ import SwiftUI
             NSApplication.shared.applicationIconImage = icon
         }
         PortableSetup.importPreparedKey()
+        AsterLanguage.migrateStoredChoice()
         store = AsterStore()
         _ = store.remote
         if (try? CredentialVault.read("openai-api-key")) == nil { store.page = "Conexiones" }
