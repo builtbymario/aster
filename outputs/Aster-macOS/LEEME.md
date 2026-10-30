@@ -11,7 +11,9 @@ Desde la isla, Aster ya no solo responde: **hace cosas**. Pídeselo con texto o 
 - **Calendario, correo y notas:** crea eventos (sin invitar a nadie), prepara borradores en Mail para que los revises y los envíes tú (Aster nunca envía correo) y busca, lee y crea notas en Apple Notas (conéctalo en Ajustes → Conexiones).
 - **Misiones:** para entregables, investigación o código, Aster lanza una misión en segundo plano en el modo adecuado; el resultado llega a Misiones y Bandeja.
 - **Lanzar una startup:** «quiero montar una startup de apuntes para estudiantes». Aster crea la empresa y arranca a todos los departamentos en paralelo: estrategia, mercado con fuentes, producto e ingeniería, growth, finanzas con modelo en CSV y legal y operaciones, más las tareas de los próximos siete días. También desde Empresas con **Lanzar startup**. Nada se publica, se contrata, se paga ni se envía.
-- **Nueve modos:** General, Study, Builder, Founder, Research, Finance, Growth, Content y Personal.
+- **Modo Auto:** el chat general elige solo el modo adecuado para cada petición y cambia cuando la conversación cambia; la cabecera muestra, por ejemplo, «AUTO · BUILDER». Los chips siguen permitiendo fijar un modo.
+- **Proactivo en todo:** cada respuesta termina con hasta tres siguientes pasos como botones (después de explicar, ejercicios; después de código, tests; después de una web, investigar la idea…). Pulsa uno o responde «sí» y Aster lo hace. Cuando termina una misión que lanzó desde el chat, Aster vuelve solo al chat, te dice qué está listo y propone lo siguiente.
+- **Nueve modos:** Auto, Study, Builder, Founder, Research, Finance, Growth, Content y Personal.
 
 ## En desarrollo: seguridad de acciones
 

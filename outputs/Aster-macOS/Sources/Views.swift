@@ -355,8 +355,14 @@ struct MainView: View {
                                             if message.role == "assistant" { Button { store.speak(message.text, agentID: mission.specialistID) } label: { Image(systemName: store.speaking ? "stop.circle" : "speaker.wave.2").font(.system(size: 10)) }.buttonStyle(.plain).accessibilityLabel(L("Leer en voz alta")) }
                                             Button { NSPasteboard.general.clearContents(); NSPasteboard.general.setString(message.text, forType: .string) } label: { Image(systemName: "doc.on.doc").font(.system(size: 10)) }.buttonStyle(.plain).accessibilityLabel(L("Copiar mensaje"))
                                         }
-                                        RichMessage(text: message.text).equatable()
+                                        RichMessage(text: AsterMarkup.display(message.text)).equatable()
                                     }.padding(message.role == "user" ? 16 : 0).background(message.role == "user" ? Color.primary.opacity(0.045) : .clear, in: RoundedRectangle(cornerRadius: 16))
+                                }
+                                if !store.isRunning(mission.id), let steps = mission.suggestions, !steps.isEmpty {
+                                    NextSteps(steps: steps, enabled: store.hasCapacity) { step in
+                                        if mission.engine == "direct", store.desktopMission(for: mission.specialistID)?.id == mission.id { store.sendDesktop(step, agentID: mission.specialistID) }
+                                        else { store.selectedMission = mission.id; store.run(step) }
+                                    }.frame(maxWidth: 520, alignment: .leading)
                                 }
                                 if let error = mission.error {
                                     VStack(alignment: .leading, spacing: 12) {

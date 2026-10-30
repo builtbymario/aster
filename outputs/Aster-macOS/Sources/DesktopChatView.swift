@@ -18,7 +18,12 @@ struct DesktopChatView: View {
     private var working: Bool { store.isRunning(mission?.id) }
     private var recovering: Bool { ["Por recuperar", "Cancelación pendiente"].contains(mission?.status ?? "") }
     private var draft: Binding<String> { Binding(get: { desktop.drafts[agentID] ?? "" }, set: { desktop.setDraft($0, agentID: agentID) }) }
-    private var lastAnswer: String { mission?.messages.last(where: { $0.role == "assistant" })?.text ?? "" }
+    private var lastAnswer: String { AsterMarkup.display(mission?.messages.last(where: { $0.role == "assistant" })?.text ?? "") }
+    /// In Auto, the mode Aster chose for the latest answer.
+    private var modeLabel: String {
+        guard agent.id == "director", let id = mission?.activeMode, id != "director", let chosen = store.state.specialists.first(where: { $0.id == id }) else { return agent.mode }
+        return agent.mode + " · " + chosen.mode
+    }
     private var changes: String { "\(mission?.id.uuidString ?? "new")-\(mission?.messages.count ?? 0)-\(lastAnswer.count)" }
     private var status: String {
         switch store.mood(for: agentID) {
@@ -61,7 +66,7 @@ struct DesktopChatView: View {
             CompanionAvatar(style: style, mood: store.mood(for: agentID), dimension: 36, animateAtRest: false, framesPerSecond: 30).accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 3) {
                 Text("Aster").font(.system(size: 14, weight: .semibold)).tracking(-0.2)
-                MonoLabel(agent.mode + " · " + L(status), color: store.mood(for: agentID) == .calm ? .asterMuted : .asterAccent)
+                MonoLabel(modeLabel + " · " + L(status), color: store.mood(for: agentID) == .calm ? .asterMuted : .asterAccent)
             }
             Spacer(minLength: 4)
             icon("plus", "Nueva conversación") { store.newDesktopConversation(agentID: agentID) }.disabled(working)
@@ -107,7 +112,7 @@ struct DesktopChatView: View {
                                     Text(verbatim: message.text).font(.system(size: 13)).lineSpacing(3).textSelection(.enabled)
                                         .padding(.horizontal, 11).padding(.vertical, 8).background(Color.asterRaised, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                                 }
-                            } else { RichMessage(text: message.text).equatable().frame(maxWidth: .infinity, alignment: .leading) }
+                            } else { RichMessage(text: AsterMarkup.display(message.text)).equatable().frame(maxWidth: .infinity, alignment: .leading) }
                         }
                     }
                     if working {
@@ -120,6 +125,9 @@ struct DesktopChatView: View {
                             Button { NSPasteboard.general.clearContents(); NSPasteboard.general.setString(lastAnswer, forType: .string) } label: { Label(L("Copiar"), systemImage: "doc.on.doc").labelStyle(TightLabelStyle()) }
                             Button { store.speak(lastAnswer, agentID: agentID) } label: { Label(L(store.speaking ? "Detener voz" : "Escuchar"), systemImage: store.speaking ? "stop.fill" : "speaker.wave.2").labelStyle(TightLabelStyle()) }
                         }.font(.system(size: 11)).buttonStyle(.plain).foregroundStyle(Color.asterMuted)
+                        if let steps = mission?.suggestions, !steps.isEmpty {
+                            NextSteps(steps: steps, enabled: store.hasCapacity) { step in if store.sendDesktop(step, agentID: agentID) { desktop.pinned = true } }.padding(.top, 2)
+                        }
                     }
                     Color.clear.frame(height: 1).id("desktop-bottom").background(GeometryReader { geometry in
                         Color.clear.preference(key: DesktopChatBottomKey.self, value: geometry.frame(in: .named("desktop-scroll")).maxY)

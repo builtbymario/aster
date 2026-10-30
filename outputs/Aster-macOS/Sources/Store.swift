@@ -121,6 +121,10 @@ import Combine
         if state.preferences.intelligence?.responseLanguage == "ca" { state.preferences.intelligence?.responseLanguage = "auto" }
         // Modes added in later versions join existing workspaces.
         for mode in Specialist.defaults where !state.specialists.contains(where: { $0.id == mode.id }) { state.specialists.append(mode) }
+        // The general mode became Auto; keep any custom personality but update its description.
+        if let index = state.specialists.firstIndex(where: { $0.id == "director" }), state.specialists[index].role == "Dirección" {
+            state.specialists[index].role = "Automático"; state.specialists[index].detail = Specialist.autoDetail
+        }
         if state.preferences.watchReminders == true { remindersStatus = EKEventStore.authorizationStatus(for: .reminder) == .fullAccess ? "Conectado" : "Permiso pendiente" }
         if state.preferences.watchCalendar { calendarStatus = EKEventStore.authorizationStatus(for: .event) == .fullAccess ? "Conectado" : "Permiso pendiente" }
         if state.preferences.watchMail { mailStatus = "Activado · pendiente de revisión" }
@@ -324,16 +328,42 @@ import Combine
         return true
     }
     /// Desktop companions answer through a ChatProvider: streamed, with Aster's local tools, and the transcript kept here.
-    private func runQuick(_ text: String, index: Int, agent: Specialist, screen: Bool = false) -> Bool {
+    /// Applies Aster's hidden notes to the latest answer: clean text, chosen mode and proposed next steps.
+    func applyMarkup(to id: UUID) {
+        guard let index = state.missions.firstIndex(where: { $0.id == id }), let last = state.missions[index].messages.lastIndex(where: { $0.role == "assistant" }) else { return }
+        let parsed = AsterMarkup.parse(state.missions[index].messages[last].text)
+        state.missions[index].messages[last].text = parsed.text
+        // The cleaned text is final; a later stream flush must not write the raw parts back.
+        runtimes[id]?.parts = [:]; runtimes[id]?.partOrder = []
+        if let mode = parsed.mode, state.specialists.contains(where: { $0.id == mode }) { state.missions[index].activeMode = mode }
+        state.missions[index].suggestions = parsed.next.isEmpty ? nil : parsed.next
+    }
+    /// When a mission started from a quick chat ends, Aster returns to that chat on its own with
+    /// what is ready, where to find it and what could come next.
+    func followUp(afterMission id: UUID) {
+        guard let mission = state.missions.first(where: { $0.id == id }), let parent = mission.parentChat,
+              let index = state.missions.firstIndex(where: { $0.id == parent }), state.missions[index].engine == "direct",
+              !isRunning(parent), hasCapacity, let mode = state.specialists.first(where: { $0.id == state.missions[index].specialistID }) else { return }
+        let result = String((mission.messages.last { $0.role == "assistant" }?.text ?? "").prefix(4000))
+        let files = (mission.artifactRecords ?? []).map { URL(fileURLWithPath: $0.path).lastPathComponent }
+        let outcome = mission.status == "Completada" ? "has finished" : "has stopped (status: \(mission.status); \(mission.error ?? ""))"
+        let event = "Aster event, not a message from the user: the mission «\(mission.title)» you started in \(mission.specialistID) mode \(outcome). Files: \(files.isEmpty ? "none" : files.joined(separator: ", ")).\nResult:\n\(result)\n\nTell the user in two or three sentences what is ready and where to find it (Missions in Aster), then propose the next steps."
+        _ = runQuick(event, index: index, agent: mode, hidden: true)
+    }
+    private func runQuick(_ text: String, index: Int, agent: Specialist, screen: Bool = false, hidden: Bool = false) -> Bool {
         let id = state.missions[index].id
         if let old = state.missions[index].sessionID {
             state.missions[index].previousSessions = (state.missions[index].previousSessions ?? []) + [old]; state.missions[index].sessionID = nil
         }
-        let request = ChatTurnRequest(model: settings.quickModel ?? settings.model, effort: QuickChat.effort, instructions: QuickChat.instructions(for: agent, settings: settings),
-                                      history: QuickChat.history(state.missions[index].messages), input: inputContext(text: text, company: nil, attachments: [], agentID: agent.id),
+        var history = QuickChat.history(state.missions[index].messages)
+        // The model sees what it proposed, so "sí" or a tapped step continues that thread.
+        if let steps = state.missions[index].suggestions, !steps.isEmpty, history.last?.role == "assistant" { history[history.count - 1].text += "\n[[next: " + steps.joined(separator: " | ") + "]]" }
+        state.missions[index].suggestions = nil
+        let request = ChatTurnRequest(model: settings.quickModel ?? settings.model, effort: QuickChat.effort, instructions: QuickChat.instructions(for: agent, settings: settings, modes: state.specialists),
+                                      history: history, input: inputContext(text: text, company: nil, attachments: [], agentID: agent.id),
                                       tools: QuickChat.tools(settings: settings), webSearch: settings.webSearch)
         state.missions[index].engine = "direct"; state.missions[index].attachmentNames = state.missions[index].attachmentNames ?? []
-        state.missions[index].messages.append(.init(role: "user", text: text + (screen ? "\n\n🖥 " + L("Con tu pantalla") : "")))
+        if !hidden { state.missions[index].messages.append(.init(role: "user", text: text + (screen ? "\n\n🖥 " + L("Con tu pantalla") : ""))) }
         state.missions[index].messages.append(.init(role: "assistant", text: ""))
         state.missions[index].status = "Trabajando"; state.missions[index].error = nil; state.missions[index].turnID = nil
         state.missions[index].updated = Date(); state.missions[index].started = Date(); state.missions[index].elapsedSeconds = nil
@@ -353,7 +383,7 @@ import Combine
                     case .activity(let message): self?.setActivity(message, for: id)
                     }
                 })
-                flush(id); setStatus(id, "Completada"); connectionStatus = "Conectado a OpenAI"; connectionReady = true
+                flush(id); applyMarkup(to: id); setStatus(id, "Completada"); connectionStatus = "Conectado a OpenAI"; connectionReady = true
                 if spokenTurns.remove(id) != nil, state.preferences.speakReplies != false, !listener.active, let item = state.missions.first(where: { $0.id == id }),
                    let answer = item.messages.last(where: { $0.role == "assistant" })?.text, !answer.isEmpty {
                     replySpeaker(answer, item.specialistID)
@@ -415,7 +445,7 @@ import Combine
             if !result.1.isEmpty, let i = state.missions.firstIndex(where: { $0.id == id }), let last = state.missions[i].messages.lastIndex(where: { $0.role == "assistant" }) { state.missions[i].messages[last].text = result.1; runtimes[id]?.parts = [:]; runtimes[id]?.partOrder = [] }
             if result.0 != "completed" { setStatus(id, "Por recuperar", error: result.2 ?? "Comprueba el estado de la sesión antes de continuar."); return }
         } catch { setStatus(id, "Por recuperar", error: "No se ha podido verificar el resultado: " + error.localizedDescription); return }
-        setStatus(id, "Completada"); connectionStatus = "Conectado a OpenAI"; connectionReady = true
+        applyMarkup(to: id); setStatus(id, "Completada"); connectionStatus = "Conectado a OpenAI"; connectionReady = true
         do {
             let files = try await api.artifacts(sid, turnID: item.turnID)
             if let i = state.missions.firstIndex(where: { $0.id == id }) {
@@ -423,6 +453,7 @@ import Combine
                 if selectedMission == id { artifacts = state.missions[i].artifactRecords ?? [] }
             }
         } catch { notice = "La misión terminó, pero no se pudo cargar su lista de archivos: " + error.localizedDescription }
+        followUp(afterMission: id)
         if proactive, let item = state.missions.first(where: { $0.id == id }) { addNote(title: "El equipo ha preparado una propuesta", text: String((item.messages.last?.text ?? "Abre la misión para revisar el resultado.").prefix(450)), fingerprint: id.uuidString, missionID: id) }
     }
     private func failed(_ id: UUID, error: Error, proactive: Bool) async {
@@ -436,6 +467,7 @@ import Combine
             }
         }
         setStatus(id, status, error: message.isEmpty ? nil : message)
+        followUp(afterMission: id)
         if message.contains("facturación") || message.contains("límite de uso") { connectionStatus = "Límite de uso · revisa la facturación"; connectionReady = false; state.preferences.autonomous = false }
         if proactive { state.preferences.autonomous = false; addNote(title: "La misión necesita atención", text: message, fingerprint: "failure-" + id.uuidString, missionID: id) }
     }

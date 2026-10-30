@@ -209,7 +209,10 @@ extension AsterStore {
                 started = run(String(brief.prefix(20000)), companyID: company?.id, fresh: true, specialistID: mode, background: true)
             }
             guard started, let mission = state.missions.first else { throw AsterError.message("Ahora hay demasiados trabajos en marcha. Inténtalo cuando termine alguno.") }
-            if let title = call.arguments["title"] as? String, !title.isEmpty, let index = state.missions.firstIndex(where: { $0.id == mission.id }) { state.missions[index].title = String(title.prefix(70)) }
+            if let index = state.missions.firstIndex(where: { $0.id == mission.id }) {
+                if let title = call.arguments["title"] as? String, !title.isEmpty { state.missions[index].title = String(title.prefix(70)) }
+                state.missions[index].parentChat = missionID
+            }
             output = ["started": true, "mission_id": mission.id.uuidString, "mode": mission.specialistID, "company": company?.name ?? "", "kickoff": kickoff,
                       "note": "The mission runs in the background; its result and files appear in Aster's Missions and Inbox."]
         case "aster_computer":

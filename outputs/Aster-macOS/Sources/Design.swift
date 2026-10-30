@@ -230,3 +230,25 @@ struct AvatarStage: View {
         }.frame(width: dimension * 1.3, height: dimension)
     }
 }
+
+/// Aster's proposed next steps under an answer; choosing one asks Aster to do it.
+struct NextSteps: View {
+    var steps: [String]
+    var enabled: Bool
+    var choose: (String) -> Void
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            MonoLabel(L("Siguiente"), size: 9)
+            ForEach(steps, id: \.self) { step in
+                Button { choose(step) } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "arrow.turn.down.right").font(.system(size: 10, weight: .semibold)).foregroundStyle(Color.asterAccent)
+                        Text(step).font(.system(size: 12)).multilineTextAlignment(.leading).foregroundStyle(Color.primary)
+                        Spacer(minLength: 0)
+                    }.padding(.horizontal, 10).padding(.vertical, 8)
+                        .background(Color.asterAccentSoft.opacity(0.55), in: RoundedRectangle(cornerRadius: 8, style: .continuous)).contentShape(Rectangle())
+                }.buttonStyle(FluidButtonStyle()).disabled(!enabled)
+            }
+        }
+    }
+}

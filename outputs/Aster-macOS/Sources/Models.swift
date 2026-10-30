@@ -9,7 +9,7 @@ struct Specialist: Identifiable, Codable {
     var style: AvatarStyle
     var personality: String?
     static let defaults: [Specialist] = [
-        .init(id: "director", name: "Aster", role: "Dirección", detail: "Conecta ideas, organiza el equipo y convierte objetivos en próximos pasos.", style: .init(form: .pebble, tint: .lilac)),
+        .init(id: "director", name: "Aster", role: "Automático", detail: Specialist.autoDetail, style: .init(form: .pebble, tint: .lilac)),
         .init(id: "growth", name: "Milo", role: "Marketing", detail: "Posicionamiento, campañas, contenidos y crecimiento con resultados medibles.", style: .init(form: .pill, tint: .peach)),
         .init(id: "builder", name: "Nova", role: "Desarrollo", detail: "Webs, productos y código. Construye, verifica y explica sus decisiones.", style: .init(form: .orbit, tint: .mint)),
         .init(id: "strategy", name: "Sage", role: "Negocio", detail: "Planes de negocio, investigación y escenarios con supuestos explícitos.", style: .init(form: .pebble, tint: .pearl)),
@@ -24,7 +24,7 @@ extension Specialist {
     /// Aster is one companion; each specialist is a mode with its own conversation, voice and personality.
     var mode: String {
         switch id {
-        case "director": return "General"
+        case "director": return "Auto"
         case "growth": return "Growth"
         case "builder": return "Builder"
         case "strategy": return "Founder"
@@ -51,6 +51,7 @@ extension Specialist {
     }
     /// "Aster · Builder", or "Aster" for the general mode.
     var title: String { id == "director" ? "Aster" : "Aster · " + mode }
+    static let autoDetail = "Elige el modo adecuado para cada petición, cambia cuando hace falta y te propone los siguientes pasos."
     /// Modes in the order the interface shows them.
     static let modeOrder = ["director", "study", "builder", "strategy", "research", "finance", "growth", "content", "personal"]
 }
@@ -88,6 +89,12 @@ struct Mission: Identifiable, Codable {
     var artifactRecords: [AgentArtifact]?
     /// "direct" for quick chats answered by a ChatProvider; nil for hosted agent sessions.
     var engine: String?
+    /// The mode Aster chose for the latest answer (Auto conversations switch freely).
+    var activeMode: String?
+    /// Next steps Aster proposed after its latest answer.
+    var suggestions: [String]?
+    /// The quick chat that started this mission; Aster returns there when it finishes.
+    var parentChat: UUID?
 }
 struct InboxNote: Identifiable, Codable {
     var id = UUID()
