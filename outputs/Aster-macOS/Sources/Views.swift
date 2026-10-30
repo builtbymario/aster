@@ -42,9 +42,9 @@ struct MainView: View {
         }
         .padding(14).padding(.top, 10)
         .frame(minWidth: 1020, minHeight: 760)
-        .background(AmbientBackdrop(tint: store.agent.style.tint.color))
+        .background(AmbientBackdrop(tint: Color.asterAccent))
         .foregroundStyle(.primary)
-        .tint(scheme == .dark ? .white : .black)
+        .tint(Color.asterAccent)
         .preferredColorScheme(AsterAppearance(rawValue: appearance)?.scheme)
         .environment(\.locale, Locale(identifier: language))
         .animation(AsterMotion.spring(reduceMotion), value: store.page)
@@ -55,51 +55,52 @@ struct MainView: View {
         .background(Button(L("")) { composerFocused = true }.keyboardShortcut("l", modifiers: .command).hidden())
         .onChange(of: store.notice) { _, new in if !new.isEmpty { showNotice = true } }
         .alert("Aster", isPresented: $showNotice) { Button(L("Entendido")) { store.notice = "" } } message: { Text(L(store.notice)) }
+        .accessibilityHidden(store.onboarding)
+        .overlay { if store.onboarding { OnboardingView().transition(.opacity) } }
+        .animation(AsterMotion.spring(reduceMotion), value: store.onboarding)
     }
+    /// Display name of a page; the internal identifiers stay unchanged.
+    private func pageTitle(_ page: String) -> String { page == "Personajes" ? "Inicio" : page }
     private var sidebar: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 11) {
-                ZStack {
-                    Circle().fill(.primary.opacity(0.09)).frame(width: 30, height: 30)
-                    Image(systemName: "sparkle").font(.system(size: 16, weight: .medium)).foregroundStyle(.primary.opacity(0.7))
-                }
-                Text(L("aster")).font(.system(size: 25, weight: .semibold, design: .rounded)).tracking(-0.7)
+                CompanionAvatar(style: store.state.specialists.first { $0.id == "director" }?.style ?? AvatarStyle(), mood: store.mood(), dimension: 34, animateAtRest: false, framesPerSecond: 30)
+                Text("aster").font(.system(size: 21, weight: .semibold)).tracking(-0.6)
             }.padding(.top, 22).padding(.bottom, 9)
-            Text(L("Ideas que cobran vida.")).font(.system(size: 11)).foregroundStyle(muted).padding(.bottom, 22)
+            MonoLabel("Personal AI · Mac", size: 9).padding(.bottom, 20)
             ForEach(pages, id: \.0) { item in
                 Button { navigate(item.0) } label: {
                     HStack(spacing: 12) {
-                        Image(systemName: item.1).font(.system(size: 14, weight: .medium)).frame(width: 18)
-                        Text(L(item.0)).font(.system(size: 12, weight: store.page == item.0 ? .semibold : .medium))
+                        Image(systemName: item.1).font(.system(size: 13, weight: .medium)).frame(width: 18).foregroundStyle(store.page == item.0 ? Color.asterAccent : Color.secondary)
+                        Text(L(pageTitle(item.0))).font(.system(size: 12.5, weight: store.page == item.0 ? .semibold : .regular))
                         Spacer(minLength: 0)
                         if item.0 == "Bandeja" && store.unread > 0 {
-                            Text("\(store.unread)").font(.system(size: 9, weight: .semibold)).frame(minWidth: 17, minHeight: 17).background(store.agent.style.tint.color.opacity(0.4), in: Capsule())
+                            Text("\(store.unread)").font(.system(size: 9, weight: .semibold)).frame(minWidth: 17, minHeight: 17).foregroundStyle(Color.asterAccentText).background(Color.asterAccentSoft, in: Capsule())
                         }
-                    }.padding(.horizontal, 12).frame(height: 37)
+                    }.padding(.horizontal, 10).frame(height: 32)
                         .foregroundStyle(store.page == item.0 ? Color.primary : Color.secondary)
                         .background {
                             if store.page == item.0 {
-                                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                    .fill(.primary.opacity(scheme == .dark ? 0.12 : 0.075))
-                                    .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(.white.opacity(scheme == .dark ? 0.18 : 0.7)))
+                                RoundedRectangle(cornerRadius: 8, style: .continuous).fill(Color.asterRaised)
+                                    .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Color.asterHairline))
                                     .matchedGeometryEffect(id: "navigation", in: navigationNamespace)
                             }
                         }
                 }.buttonStyle(FluidButtonStyle()).accessibilityAddTraits(store.page == item.0 ? .isSelected : []).padding(.bottom, 3)
             }
             Spacer(minLength: 10)
-            HStack { Text(L("TU EQUIPO")).font(.system(size: 9, weight: .semibold)).tracking(1.4); Spacer(); Text("\(store.state.specialists.count)").font(.system(size: 9)) }.foregroundStyle(muted).padding(.bottom, 13)
-            ForEach(store.state.specialists) { agent in
+            HStack { MonoLabel(L("Modos"), size: 9); Spacer() }.padding(.bottom, 8)
+            ForEach(Specialist.modeOrder.compactMap { id in store.state.specialists.first { $0.id == id } }) { agent in
                 Button { select(agent.id); navigate("Personajes") } label: {
                     HStack(spacing: 9) {
-                        Circle().fill(agent.style.tint.color).frame(width: 7, height: 7).overlay(Circle().stroke(.primary.opacity(0.09)))
-                        Text(agent.name).font(.system(size: 12, weight: store.agent.id == agent.id ? .semibold : .regular))
+                        Image(systemName: agent.symbol).font(.system(size: 10, weight: .medium)).frame(width: 16).foregroundStyle(store.agent.id == agent.id ? Color.asterAccent : muted)
+                        Text(agent.mode).font(.asterMono(11, weight: store.agent.id == agent.id ? .semibold : .regular))
                         Spacer(minLength: 2)
-                        Text(L(agent.role)).font(.system(size: 9)).foregroundStyle(muted)
-                    }.foregroundStyle(store.agent.id == agent.id ? Color.primary : Color.secondary).frame(height: 27)
-                }.buttonStyle(FluidButtonStyle())
+                        if store.isAgentWorking(agent.id) { Circle().fill(Color.asterAccent).frame(width: 5, height: 5) }
+                    }.foregroundStyle(store.agent.id == agent.id ? Color.primary : Color.secondary).frame(height: 26).padding(.horizontal, 10).contentShape(Rectangle())
+                }.buttonStyle(FluidButtonStyle()).accessibilityAddTraits(store.agent.id == agent.id ? .isSelected : [])
             }
-            Rectangle().fill(.primary.opacity(0.07)).frame(height: 1).padding(.vertical, 18)
+            Rectangle().fill(Color.asterHairline).frame(height: 1).padding(.vertical, 16)
             Button(action: showCompanion) {
                 HStack(spacing: 9) {
                     Image(systemName: "macwindow.on.rectangle").font(.system(size: 13))
@@ -115,13 +116,13 @@ struct MainView: View {
     }
     private var toolbar: some View {
         HStack(spacing: 10) {
-            Text(L(store.page)).font(.system(size: 14, weight: .semibold)).padding(.leading, 6)
+            Text(L(pageTitle(store.page))).font(.system(size: 15, weight: .semibold)).tracking(-0.2).padding(.leading, 6)
             Spacer()
             LiquidGroup(spacing: 12) {
                 HStack(spacing: 10) {
                     HStack(spacing: 7) {
                         Circle().fill(store.connectionReady ? Color.green : Color.orange).frame(width: 5, height: 5)
-                        Text(L(store.busy ? "Trabajando" : store.connectionStatus == "Conectado a OpenAI" ? "Conectado" : store.connectionReady ? "Clave válida" : "Conexión pendiente")).font(.system(size: 10, weight: .medium))
+                        Text(L(store.busy ? "Trabajando" : store.connectionStatus.hasPrefix("Conectado a") ? "Conectado" : store.connectionReady ? "Clave válida" : "Conexión pendiente")).font(.system(size: 10, weight: .medium))
                     }.padding(.horizontal, 13).frame(height: 34).liquidSurface(18)
                     GlassIconButton(symbol: AsterAppearance(rawValue: appearance)?.symbol ?? "circle.lefthalf.filled", title: "Apariencia") { choosingAppearance = true }
                         .popover(isPresented: $choosingAppearance, arrowEdge: .bottom) { appearancePicker }
@@ -163,18 +164,18 @@ struct MainView: View {
             VStack(alignment: .leading, spacing: 14) {
                 HStack(alignment: .center) {
                     VStack(alignment: .leading, spacing: 8) {
-                        HStack(spacing: 6) { Image(systemName: "sparkle"); Text(L("HECHO PARA TI")) }.font(.system(size: 9, weight: .semibold)).tracking(1.5).foregroundStyle(muted)
-                        Text(L("Tu equipo, contigo.")).font(.system(size: 33, weight: .semibold, design: .rounded)).tracking(-1.1)
-                        Text(L("Un poco de compañía. Un mundo de posibilidades.")).font(.system(size: 12)).foregroundStyle(muted)
+                        MonoLabel(L("Tu compañero de IA"), size: 9)
+                        Text(L("Un Aster. Todos sus modos.")).font(.system(size: 30, weight: .semibold)).tracking(-1)
+                        Text(L("Elige cómo te ayuda: cada modo guarda su conversación, su voz y su forma de trabajar.")).font(.system(size: 12)).foregroundStyle(muted)
                     }
                     Spacer(minLength: 8)
                     GlassAction(title: "Personalizar", symbol: "paintbrush.pointed") { customizing = true }
                 }.padding(.top, 6)
                 characterHero
                 HStack {
-                    Text(L("Encuentra tu compañía")).font(.system(size: 12, weight: .semibold))
+                    MonoLabel(L("Modos"), size: 9)
                     Spacer()
-                    Text(L("Seis mentes. Un mismo equipo.")).font(.system(size: 10)).foregroundStyle(muted)
+                    MonoLabel(LF("Un compañero · %d modos", store.state.specialists.count), size: 9)
                 }.padding(.top, 2)
                 agentDock
                 HStack(spacing: 10) {
@@ -188,37 +189,35 @@ struct MainView: View {
     private var characterHero: some View {
         HStack(spacing: 6) {
             VStack(alignment: .leading, spacing: 12) {
-                HStack(spacing: 6) {
-                    Image(systemName: store.agent.id == "builder" ? "curlybraces" : store.agent.id == "growth" ? "megaphone" : store.agent.id == "strategy" ? "chart.xyaxis.line" : store.agent.id == "personal" ? "heart" : "sparkle").font(.system(size: 9))
-                    Text(L(store.agent.role)).font(.system(size: 10, weight: .medium))
-                }.foregroundStyle(muted).padding(.horizontal, 10).padding(.vertical, 6).background(.primary.opacity(0.035), in: Capsule())
-                Text(store.agent.name).font(.system(size: 30, weight: .semibold, design: .rounded)).tracking(-0.7).contentTransition(.interpolate)
+                HStack(spacing: 6) { Image(systemName: store.agent.symbol).font(.system(size: 9, weight: .medium)); MonoLabel(store.agent.mode + " · " + L(store.agent.role), color: .asterAccentText) }
+                    .foregroundStyle(Color.asterAccentText).padding(.horizontal, 8).padding(.vertical, 5).background(Color.asterAccentSoft, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+                Text("Aster").font(.system(size: 32, weight: .semibold)).tracking(-0.9)
                 Text(L(store.agent.detail)).font(.system(size: 12)).foregroundStyle(muted).lineSpacing(5).frame(maxWidth: 300, alignment: .leading).contentTransition(.opacity)
-                MoodPicker(selection: $store.previewMood, tint: store.agent.style.tint.color).padding(.top, 5)
+                MoodPicker(selection: $store.previewMood, tint: Color.asterAccent).padding(.top, 5)
             }.padding(.leading, 25).padding(.vertical, 20)
             Spacer(minLength: 2)
-            AvatarStage(style: store.agent.style, mood: store.isAgentWorking(store.agent.id) ? .thinking : store.previewMood, dimension: 224)
+            AvatarStage(style: store.agent.style, mood: store.mood(for: store.agent.id) == .calm ? store.previewMood : store.mood(for: store.agent.id), dimension: 224)
                 .id(store.agent.id).transition(reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 0.90))).padding(.trailing, 14)
         }.frame(maxWidth: .infinity, minHeight: 239).frostedSurface(28)
         .animation(AsterMotion.spring(reduceMotion), value: store.agent.id)
     }
     private var agentDock: some View {
-        LiquidGroup(spacing: 8) {
-            HStack(spacing: 12) {
-                ForEach(store.state.specialists) { agent in
-                    Button { select(agent.id) } label: {
-                        VStack(spacing: 3) {
-                            CompanionAvatar(style: agent.style, dimension: 68, animateAtRest: false, framesPerSecond: 30)
-                            HStack(spacing: 5) { Text(agent.name).font(.system(size: 11, weight: .semibold)); if store.agent.id == agent.id { Image(systemName: "checkmark.circle.fill").font(.system(size: 9)).foregroundStyle(muted) } }
-                            Text(L(agent.role)).font(.system(size: 9)).foregroundStyle(muted)
-                        }.frame(maxWidth: .infinity).padding(.top, 3).padding(.bottom, 13)
-                            .frostedSurface(21)
-                            .liquidID(agent.id, in: agentNamespace)
-                            .overlay(RoundedRectangle(cornerRadius: 21).strokeBorder(store.agent.id == agent.id ? Color.primary.opacity(0.25) : .clear, lineWidth: 1.2))
-                    }.buttonStyle(FluidButtonStyle(lift: 3)).accessibilityAddTraits(store.agent.id == agent.id ? .isSelected : [])
-                }
-            }.padding(.vertical, 5)
-        }
+        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 5), spacing: 8) {
+            ForEach(Specialist.modeOrder.compactMap { id in store.state.specialists.first { $0.id == id } }) { agent in
+                let selected = store.agent.id == agent.id
+                Button { select(agent.id) } label: {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Image(systemName: agent.symbol).font(.system(size: 13, weight: .medium)).foregroundStyle(selected ? Color.asterAccent : muted)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(agent.mode).font(.asterMono(11, weight: .semibold))
+                            // In English several roles equal the mode's name; the description reads better than a repeat.
+                            Text(L(agent.role).caseInsensitiveCompare(agent.mode) == .orderedSame ? L(agent.detail) : L(agent.role)).font(.system(size: 10)).foregroundStyle(muted).lineLimit(1)
+                        }
+                    }.frame(maxWidth: .infinity, alignment: .leading).padding(12).frostedSurface(12)
+                        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(selected ? Color.asterAccent : .clear, lineWidth: 1))
+                }.buttonStyle(FluidButtonStyle()).accessibilityAddTraits(selected ? .isSelected : [])
+            }
+        }.padding(.vertical, 5)
     }
     private var composer: some View {
         VStack(spacing: 8) {
@@ -233,18 +232,16 @@ struct MainView: View {
                 TextField(L(store.page == "Misiones" && store.mission != nil ? "Continúa esta misión…" : "¿Qué vamos a crear hoy?"), text: $draft, axis: .vertical)
                     .lineLimit(1...4).font(.system(size: 13)).textFieldStyle(.plain).focused($composerFocused).onSubmit { submit() }
                 Button { if store.mainWorking { store.stop() } else { submit() } } label: {
-                    Image(systemName: store.mainWorking ? "stop.fill" : "arrow.up").font(.system(size: 15, weight: .semibold)).frame(width: 37, height: 37)
-                        .foregroundStyle(.white).background(LinearGradient(colors: [Color(white: 0.28), Color(white: 0.13)], startPoint: .topLeading, endPoint: .bottomTrailing), in: Circle())
-                        .overlay(Circle().strokeBorder(.white.opacity(0.3)))
-                        .shadow(color: Color.black.opacity(0.1), radius: 6, y: 3)
+                    Image(systemName: store.mainWorking ? "stop.fill" : "arrow.up").font(.system(size: 13, weight: .semibold)).frame(width: 32, height: 32)
+                        .foregroundStyle(Color.asterOnAccent).background(Color.asterAccent, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
                         .contentTransition(.symbolEffect(.replace))
                 }.buttonStyle(FluidButtonStyle()).disabled(!store.mainWorking && draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty).accessibilityLabel(L(store.mainWorking ? "Detener misión" : "Enviar misión"))
             }.padding(.horizontal, 15).padding(.vertical, 13).frostedSurface(25)
-                .overlay(RoundedRectangle(cornerRadius: 25).strokeBorder(composerFocused ? store.agent.style.tint.color.opacity(0.7) : .clear, lineWidth: 1.2))
+                .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(composerFocused ? Color.asterAccent.opacity(0.7) : .clear, lineWidth: 1))
                 .animation(AsterMotion.quick(reduceMotion), value: composerFocused)
             HStack(spacing: 6) {
-                Circle().fill(store.agent.style.tint.color).frame(width: 4, height: 4)
-                Text(store.mainWorking ? L(store.activity) : "\(store.agent.name) · \(L(store.agent.role))").font(.system(size: 9)).foregroundStyle(muted)
+                Circle().fill(Color.asterAccent).frame(width: 4, height: 4)
+                MonoLabel(store.mainWorking ? L(store.activity) : store.agent.title + " · " + L(store.agent.role), size: 9)
                 Spacer()
                 Menu {
                     ForEach([("low", "Rápido"), ("medium", "Equilibrado"), ("high", "Profundo")], id: \.0) { value in Button { var settings = store.settings; settings.effort = value.0; store.settings = settings } label: { if store.settings.effort == value.0 { Label(L(value.1), systemImage: "checkmark") } else { Text(L(value.1)) } } }
@@ -263,7 +260,7 @@ struct MainView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 HStack {
-                    VStack(alignment: .leading, spacing: 8) { Text(L("De idea a empresa.")).font(.system(size: 31, weight: .medium, design: .rounded)); Text(L("Un objetivo compartido para todo tu equipo.")).font(.system(size: 12)).foregroundStyle(muted) }
+                    VStack(alignment: .leading, spacing: 8) { Text(L("De idea a empresa.")).font(.system(size: 31, weight: .medium)); Text(L("Un objetivo compartido para todo tu equipo.")).font(.system(size: 12)).foregroundStyle(muted) }
                     Spacer(); Button(L("Nueva empresa")) { addingCompany = true }.glassControl(prominent: true).tint(.accentColor)
                 }
                 if store.companies.isEmpty {
@@ -272,7 +269,7 @@ struct MainView: View {
                 ForEach(store.companies) { company in
                     VStack(alignment: .leading, spacing: 14) {
                         HStack {
-                            Text(company.name).font(.system(size: 22, weight: .semibold, design: .rounded)); Spacer()
+                            Text(company.name).font(.system(size: 22, weight: .semibold)); Spacer()
                             GlassIconButton(symbol: "pencil", title: "Editar empresa") { editingCompany = company }
                             Menu { Button(L("Ver sus misiones")) { companyFilter = company.id; store.page = "Misiones" }; Button(L("Archivar empresa")) { store.archiveCompany(company.id) } } label: { Image(systemName: "ellipsis").font(.system(size: 13)).frame(width: 32, height: 32) }.menuStyle(.borderlessButton).frame(width: 32)
                         }
@@ -282,6 +279,17 @@ struct MainView: View {
                             Label(LF("%d misiones", store.state.missions.filter { $0.companyID == company.id }.count), systemImage: "bubble.left.and.bubble.right")
                             Label(LF("%d tareas pendientes", store.state.tasks.filter { $0.companyID == company.id && !$0.done }.count), systemImage: "checklist")
                         }.font(.system(size: 10)).foregroundStyle(muted)
+                        Button { store.launchStartup(company.id) } label: {
+                            HStack(spacing: 10) {
+                                Image(systemName: "paperplane.fill").font(.system(size: 13, weight: .semibold))
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(L("Lanzar startup")).font(.system(size: 13, weight: .semibold))
+                                    Text(L("Todos los departamentos en paralelo: estrategia, mercado, producto, growth, finanzas y legal.")).font(.system(size: 11)).opacity(0.85)
+                                }
+                                Spacer(); Image(systemName: "arrow.right").font(.system(size: 11, weight: .semibold))
+                            }.padding(.horizontal, 14).padding(.vertical, 11).foregroundStyle(Color.asterOnAccent)
+                                .background(Color.asterAccent, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                        }.buttonStyle(FluidButtonStyle()).disabled(!store.hasCapacity)
                         HStack(spacing: 10) {
                             companyAction("Plan de negocio", agent: "strategy", company: company, input: "Prepara un plan de negocio útil: propuesta de valor, mercado, riesgos, costes, supuestos y próximos pasos.")
                             companyAction("Marketing", agent: "growth", company: company, input: "Prepara una estrategia de marketing y un primer calendario de contenidos con objetivos medibles.")
@@ -344,14 +352,20 @@ struct MainView: View {
                                 ForEach(mission.messages.filter { !$0.text.isEmpty }) { message in
                                     VStack(alignment: .leading, spacing: 8) {
                                         HStack {
-                                            Text(message.role == "user" ? L("TÚ") : (store.state.specialists.first { $0.id == mission.specialistID }?.name ?? "Aster").uppercased()).font(.system(size: 9, weight: .semibold)).tracking(1).foregroundStyle(muted)
+                                            Text(message.role == "user" ? L("TÚ") : (store.state.specialists.first { $0.id == mission.specialistID }?.title ?? "Aster").uppercased()).font(.system(size: 9, weight: .semibold)).tracking(1).foregroundStyle(muted)
                                             Text(message.date.formatted(date: .omitted, time: .shortened)).font(.system(size: 9)).foregroundStyle(muted)
                                             Spacer()
                                             if message.role == "assistant" { Button { store.speak(message.text, agentID: mission.specialistID) } label: { Image(systemName: store.speaking ? "stop.circle" : "speaker.wave.2").font(.system(size: 10)) }.buttonStyle(.plain).accessibilityLabel(L("Leer en voz alta")) }
                                             Button { NSPasteboard.general.clearContents(); NSPasteboard.general.setString(message.text, forType: .string) } label: { Image(systemName: "doc.on.doc").font(.system(size: 10)) }.buttonStyle(.plain).accessibilityLabel(L("Copiar mensaje"))
                                         }
-                                        RichMessage(text: message.text).equatable()
+                                        RichMessage(text: AsterMarkup.display(message.text)).equatable()
                                     }.padding(message.role == "user" ? 16 : 0).background(message.role == "user" ? Color.primary.opacity(0.045) : .clear, in: RoundedRectangle(cornerRadius: 16))
+                                }
+                                if !store.isRunning(mission.id), let steps = mission.suggestions, !steps.isEmpty {
+                                    NextSteps(steps: steps, enabled: store.hasCapacity) { step in
+                                        if mission.engine == "direct", store.desktopMission(for: mission.specialistID)?.id == mission.id { store.sendDesktop(step, agentID: mission.specialistID) }
+                                        else { store.selectedMission = mission.id; store.run(step) }
+                                    }.frame(maxWidth: 520, alignment: .leading)
                                 }
                                 if let error = mission.error {
                                     VStack(alignment: .leading, spacing: 12) {
@@ -359,7 +373,7 @@ struct MainView: View {
                                         Text(L(error)).font(.system(size: 12)).foregroundStyle(muted).textSelection(.enabled)
                                         HStack {
                                             Button(L("Recuperar estado"), action: { store.recover() }).disabled(store.isRunning(mission.id) || !store.hasCapacity || mission.sessionID == nil)
-                                            if error.contains("facturación") { Link("Revisar cuenta OpenAI", destination: URL(string: "https://platform.openai.com/settings/organization/billing/")!) }
+                                            if error.contains("facturación") || error.contains("saldo") { let provider: AIProvider = store.settings.usesClaude ? .anthropic : .openai; Link(LF("Revisar cuenta de %@", provider.name), destination: provider.billingURL) }
                                         }.font(.system(size: 11))
                                     }.padding(18).background(Color.orange.opacity(0.07), in: RoundedRectangle(cornerRadius: 12))
                                 }
@@ -383,7 +397,7 @@ struct MainView: View {
     private var inbox: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
-                HStack { VStack(alignment: .leading, spacing: 8) { Text(L("El equipo te escribe.")).font(.system(size: 30, weight: .medium, design: .rounded)); Text(L("Novedades, propuestas y lo que necesita tu atención.")).font(.system(size: 12)).foregroundStyle(muted) }; Spacer(); Button(L("Revisar ahora")) { Task { await store.scan() } }.glassControl() }
+                HStack { VStack(alignment: .leading, spacing: 8) { Text(L("El equipo te escribe.")).font(.system(size: 30, weight: .medium)); Text(L("Novedades, propuestas y lo que necesita tu atención.")).font(.system(size: 12)).foregroundStyle(muted) }; Spacer(); Button(L("Revisar ahora")) { Task { await store.scan() } }.glassControl() }
                 if store.state.inbox.isEmpty { empty("tray", title: "Todo tranquilo por aquí", detail: "Conecta tu agenda o Apple Mail para recibir novedades. También verás los resultados de las misiones autónomas.") }
                 ForEach(store.state.inbox) { note in
                     VStack(alignment: .leading, spacing: 10) {
@@ -396,7 +410,7 @@ struct MainView: View {
         }
     }
     private func empty(_ icon: String, title: String, detail: String) -> some View {
-        VStack(spacing: 16) { Image(systemName: icon).font(.system(size: 27, weight: .light)).foregroundStyle(muted); Text(L(title)).font(.system(size: 20, weight: .medium, design: .rounded)); Text(L(detail)).font(.system(size: 12)).foregroundStyle(muted).multilineTextAlignment(.center).lineSpacing(5).frame(maxWidth: 390) }.padding(45).frame(maxWidth: .infinity, maxHeight: .infinity)
+        VStack(spacing: 16) { Image(systemName: icon).font(.system(size: 27, weight: .light)).foregroundStyle(muted); Text(L(title)).font(.system(size: 20, weight: .medium)); Text(L(detail)).font(.system(size: 12)).foregroundStyle(muted).multilineTextAlignment(.center).lineSpacing(5).frame(maxWidth: 390) }.padding(45).frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 
@@ -411,27 +425,16 @@ struct CustomizeView: View {
     var body: some View {
         VStack(spacing: 18) {
             HStack {
-                VStack(alignment: .leading, spacing: 5) { Text(L("Hazlo tuyo.")).font(.system(size: 27, weight: .semibold, design: .rounded)).tracking(-0.7); Text(L("Pequeños detalles. Mucha personalidad.")).font(.system(size: 11)).foregroundStyle(muted) }
+                VStack(alignment: .leading, spacing: 5) { Text(L("Hazlo tuyo.")).font(.system(size: 27, weight: .semibold)).tracking(-0.7); Text(L("Pequeños detalles. Mucha personalidad.")).font(.system(size: 11)).foregroundStyle(muted) }
                 Spacer(); GlassIconButton(symbol: "xmark", title: "Cerrar personalización") { dismiss() }
             }
             VStack(spacing: 0) {
                 AvatarStage(style: agent.style, mood: mood, dimension: 166)
                     .id(agent.style.form.rawValue + agent.style.tint.rawValue)
                     .transition(reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 0.93)))
-                MoodPicker(selection: $mood, tint: agent.style.tint.color).padding(.bottom, 15)
+                MoodPicker(selection: $mood, tint: Color.asterAccent).padding(.bottom, 15)
             }.frame(maxWidth: .infinity).frostedSurface(26)
             VStack(spacing: 17) {
-                HStack { Text(L("Nombre")).font(.system(size: 12, weight: .medium)); Spacer(); TextField(L("Nombre"), text: $agent.name).textFieldStyle(.plain).padding(10).background(.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 10)).frame(width: 280) }
-                Picker(L("Forma"), selection: $agent.style.form) { ForEach(AvatarForm.allCases, id: \.self) { Text(L($0.rawValue)).tag($0) } }.pickerStyle(.segmented)
-                HStack(spacing: 14) {
-                    Text(L("Color")).font(.system(size: 12, weight: .medium)); Spacer()
-                    ForEach(AvatarTint.allCases, id: \.self) { tint in
-                        Button { withAnimation(AsterMotion.spring(reduceMotion)) { agent.style.tint = tint } } label: {
-                            Circle().fill(tint.color.gradient).frame(width: 25, height: 25).overlay(Circle().strokeBorder(.white.opacity(0.7))).padding(5)
-                                .background { if agent.style.tint == tint { Circle().strokeBorder(.primary.opacity(0.55), lineWidth: 1).matchedGeometryEffect(id: "palette", in: palette) } }
-                        }.buttonStyle(FluidButtonStyle(lift: 1)).accessibilityLabel(tint.rawValue).accessibilityAddTraits(agent.style.tint == tint ? .isSelected : [])
-                    }
-                }
                 HStack { Text(L("Tamaño")).font(.system(size: 12, weight: .medium)); Slider(value: $agent.style.size, in: 80...200).padding(.horizontal, 12); Text("\(Int(agent.style.size))").font(.system(size: 11)).foregroundStyle(muted).monospacedDigit().frame(width: 29) }
                 HStack { Toggle(L("Movimiento"), isOn: $agent.style.motion); Spacer(); Toggle(L("Efectos"), isOn: $agent.style.effects) }.font(.system(size: 12)).toggleStyle(.switch)
                 TextField(L("Personalidad y forma de hablar"), text: Binding(get: { agent.personality ?? "" }, set: { agent.personality = $0 }), axis: .vertical).lineLimit(1...3).textFieldStyle(.plain).padding(10).background(.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 10)).font(.system(size: 12))
@@ -440,11 +443,11 @@ struct CustomizeView: View {
             HStack {
                 Button(L("Restablecer")) { withAnimation(AsterMotion.spring(reduceMotion)) { if let original = Specialist.defaults.first(where: { $0.id == agent.id }) { agent = original } } }.buttonStyle(FluidButtonStyle()).font(.system(size: 11)).foregroundStyle(muted)
                 Spacer()
-                GlassAction(title: "Guardar personaje", symbol: "checkmark", prominent: true) {
+                GlassAction(title: "Guardar modo", symbol: "checkmark", prominent: true) {
                     agent.name = agent.name.trimmingCharacters(in: .whitespacesAndNewlines); if !agent.name.isEmpty { save(agent); dismiss() }
                 }.disabled(agent.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }
-        }.padding(26).frame(width: 500).background(AmbientBackdrop(tint: agent.style.tint.color)).foregroundStyle(.primary)
+        }.padding(26).frame(width: 500).background(AmbientBackdrop(tint: Color.asterAccent)).foregroundStyle(.primary)
             .animation(AsterMotion.spring(reduceMotion), value: agent.style.form)
             .animation(AsterMotion.spring(reduceMotion), value: agent.style.tint)
     }
@@ -463,7 +466,7 @@ struct CompanyForm: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 22) {
             HStack {
-                VStack(alignment: .leading, spacing: 6) { Text(L("Dale una dirección.")).font(.system(size: 27, weight: .semibold, design: .rounded)).tracking(-0.7); Text(L("Tu idea merece un buen comienzo.")).font(.system(size: 12)).foregroundStyle(muted) }
+                VStack(alignment: .leading, spacing: 6) { Text(L("Dale una dirección.")).font(.system(size: 27, weight: .semibold)).tracking(-0.7); Text(L("Tu idea merece un buen comienzo.")).font(.system(size: 12)).foregroundStyle(muted) }
                 Spacer(); GlassIconButton(symbol: "xmark", title: "Cerrar formulario de empresa") { dismiss() }
             }
             VStack(alignment: .leading, spacing: 15) {
@@ -479,34 +482,28 @@ struct CompanyForm: View {
     }
 }
 
+/// Aster floating on the desktop. Hover opens the quick chat, a click focuses it,
+/// dragging moves it, and the mascot shows when it listens, thinks or speaks.
 struct FloatingView: View {
     @EnvironmentObject var store: AsterStore
     @AppStorage("AsterAppearance") private var appearance = AsterAppearance.system.rawValue
     @AppStorage("AsterLanguage") private var language = "es"
-    var agentID: String
-    var height: CGFloat = 96
     var open: () -> Void
     var talk: () -> Void
+    var dictate: () -> Void
     var arrange: () -> Void
     var hide: () -> Void
     var moved: () -> Void
     var dragStarted: () -> Void
     var hover: (Bool) -> Void
-    private var agent: Specialist { store.state.specialists.first { $0.id == agentID } ?? Specialist.defaults[0] }
-    private var working: Bool { store.isAgentWorking(agentID) }
-    private var selected: Bool { store.agent.id == agentID }
+    private var style: AvatarStyle { store.state.specialists.first { $0.id == "director" }?.style ?? AvatarStyle() }
     var body: some View {
-        VStack(spacing: 2) {
-            CompanionAvatar(style: agent.style, mood: working ? .thinking : selected ? store.previewMood : .calm,
-                            dimension: max(1, min(64, height - 32)), animateAtRest: selected || working, framesPerSecond: 30)
-            HStack(spacing: 4) {
-                Text(agent.name).font(.system(size: 9, weight: selected ? .semibold : .medium)).lineLimit(1).truncationMode(.tail)
-                if agentID == "director" && store.unread > 0 { Circle().fill(.primary).frame(width: 3, height: 3) }
-                if working { Image(systemName: "sparkle").font(.system(size: 8)) }
-            }.padding(.horizontal, 9).frame(height: 18).liquidSurface(12)
-            Capsule().fill(.secondary.opacity(0.3)).frame(width: 16, height: 2)
-        }.padding(4).frame(width: 94, height: height).accessibilityHidden(true)
-            .overlay(CompanionInteraction(name: agent.name, open: open, talk: talk, arrange: arrange, hide: hide, moved: moved, dragStarted: dragStarted, hover: hover))
+        CompanionAvatar(style: style, mood: store.mood(), dimension: 76, animateAtRest: true, framesPerSecond: 30)
+            .overlay(alignment: .topTrailing) {
+                if store.unread > 0 { Circle().fill(Color.asterAccent).frame(width: 8, height: 8).overlay(Circle().stroke(Color.asterSurface, lineWidth: 1.5)).padding(.top, 12).padding(.trailing, 12) }
+            }
+            .frame(width: DesktopCompanions.mascotSize.width, height: DesktopCompanions.mascotSize.height).accessibilityHidden(true)
+            .overlay(CompanionInteraction(open: open, talk: talk, dictate: dictate, arrange: arrange, hide: hide, moved: moved, dragStarted: dragStarted, hover: hover))
             .environment(\.locale, Locale(identifier: language))
             .preferredColorScheme(AsterAppearance(rawValue: appearance)?.scheme)
             .help(L("Cursor para hablar · arrastra para mover · doble clic para abrir Aster"))

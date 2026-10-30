@@ -9,13 +9,51 @@ struct Specialist: Identifiable, Codable {
     var style: AvatarStyle
     var personality: String?
     static let defaults: [Specialist] = [
-        .init(id: "director", name: "Aster", role: "Dirección", detail: "Conecta ideas, organiza el equipo y convierte objetivos en próximos pasos.", style: .init(form: .pebble, tint: .lilac)),
+        .init(id: "director", name: "Aster", role: "Automático", detail: Specialist.autoDetail, style: .init(form: .pebble, tint: .lilac)),
         .init(id: "growth", name: "Milo", role: "Marketing", detail: "Posicionamiento, campañas, contenidos y crecimiento con resultados medibles.", style: .init(form: .pill, tint: .peach)),
         .init(id: "builder", name: "Nova", role: "Desarrollo", detail: "Webs, productos y código. Construye, verifica y explica sus decisiones.", style: .init(form: .orbit, tint: .mint)),
         .init(id: "strategy", name: "Sage", role: "Negocio", detail: "Planes de negocio, investigación y escenarios con supuestos explícitos.", style: .init(form: .pebble, tint: .pearl)),
         .init(id: "personal", name: "Lumi", role: "Personal", detail: "Te ayuda a pensar, crear y cuidar de tu agenda y tus prioridades.", style: .init(form: .pill, tint: .ink)),
-        .init(id: "study", name: "Atlas", role: "Aprendizaje", detail: "Aprende contigo, explica paso a paso y te ayuda con documentos, Excel y tareas en tu Mac.", style: .init(form: .orbit, tint: .pearl))
+        .init(id: "study", name: "Atlas", role: "Aprendizaje", detail: "Aprende contigo, explica paso a paso y te ayuda con documentos, Excel y tareas en tu Mac.", style: .init(form: .orbit, tint: .pearl)),
+        .init(id: "research", name: "Aster", role: "Investigación", detail: "Investiga con fuentes verificables, compara opciones y separa los datos de las estimaciones.", style: .init()),
+        .init(id: "finance", name: "Aster", role: "Finanzas", detail: "Modelos financieros, costes, precios, métricas y escenarios con supuestos explícitos.", style: .init()),
+        .init(id: "content", name: "Aster", role: "Contenido", detail: "Escribe contenido con tu voz: posts, guiones, newsletters, presentaciones y textos de producto.", style: .init())
     ]
+}
+extension Specialist {
+    /// Aster is one companion; each specialist is a mode with its own conversation, voice and personality.
+    var mode: String {
+        switch id {
+        case "director": return "Auto"
+        case "growth": return "Growth"
+        case "builder": return "Builder"
+        case "strategy": return "Founder"
+        case "personal": return "Personal"
+        case "study": return "Study"
+        case "research": return "Research"
+        case "finance": return "Finance"
+        case "content": return "Content"
+        default: return role
+        }
+    }
+    var symbol: String {
+        switch id {
+        case "growth": return "chart.line.uptrend.xyaxis"
+        case "builder": return "chevron.left.forwardslash.chevron.right"
+        case "strategy": return "briefcase"
+        case "personal": return "heart"
+        case "study": return "graduationcap"
+        case "research": return "magnifyingglass"
+        case "finance": return "chart.pie"
+        case "content": return "square.and.pencil"
+        default: return "sparkle"
+        }
+    }
+    /// "Aster · Builder", or "Aster" for the general mode.
+    var title: String { id == "director" ? "Aster" : "Aster · " + mode }
+    static let autoDetail = "Elige el modo adecuado para cada petición, cambia cuando hace falta y te propone los siguientes pasos."
+    /// Modes in the order the interface shows them.
+    static let modeOrder = ["director", "study", "builder", "strategy", "research", "finance", "growth", "content", "personal"]
 }
 struct Company: Identifiable, Codable {
     var id = UUID()
@@ -49,6 +87,14 @@ struct Mission: Identifiable, Codable {
     var elapsedSeconds: Double?
     var attachmentNames: [String]?
     var artifactRecords: [AgentArtifact]?
+    /// "direct" for quick chats answered by a ChatProvider; nil for hosted agent sessions.
+    var engine: String?
+    /// The mode Aster chose for the latest answer (Auto conversations switch freely).
+    var activeMode: String?
+    /// Next steps Aster proposed after its latest answer.
+    var suggestions: [String]?
+    /// The quick chat that started this mission; Aster returns there when it finishes.
+    var parentChat: UUID?
 }
 struct InboxNote: Identifiable, Codable {
     var id = UUID()
@@ -61,6 +107,8 @@ struct InboxNote: Identifiable, Codable {
 }
 struct Preferences: Codable {
     var selectedAgent = "director"
+    /// Set once the welcome is finished; people who connected a key before it existed skip it.
+    var onboarded: Bool?
     var notifications = false
     var watchCalendar = false
     var watchMail = false
@@ -84,6 +132,13 @@ struct Preferences: Codable {
     var quietEnd: Int?
     var autonomousBrief: String?
     var parallelMissions: Int?
+    /// Read the answer aloud when the question was spoken. nil means on.
+    var speakReplies: Bool?
+    /// ⌥Space starts and ends dictation from any app. nil means on.
+    var voiceShortcut: Bool?
+    /// "island" (in the notch, the default) or "floating" (a mascot on the desktop).
+    var desktopStyle: String?
+    var watchNotes: Bool?
 }
 struct IntelligenceSettings: Codable, Equatable {
     var model = "gpt-6-astra"
@@ -100,6 +155,29 @@ struct IntelligenceSettings: Codable, Equatable {
     var maxMinutes = 12
     var userName = ""
     var instructions = ""
+    /// Model for the quick chat of the desktop companions; nil uses `model`.
+    var quickModel: String?
+    /// "openai" or "anthropic". nil is OpenAI, as before the provider could be chosen.
+    var provider: String?
+    /// The Claude model for everything Aster does when the provider is Anthropic.
+    var claudeModel: String?
+    var usesClaude: Bool { provider == AIProvider.anthropic.rawValue }
+    var providerName: String { usesClaude ? "Claude" : "OpenAI" }
+    /// The model for quick conversations, and the one for missions, the Mac and the screen.
+    var chatModel: String { usesClaude ? claudeModel ?? AnthropicAPI.defaultModel : quickModel ?? model }
+    var workModel: String { usesClaude ? claudeModel ?? AnthropicAPI.defaultModel : model }
+}
+enum AIProvider: String, CaseIterable {
+    case openai, anthropic
+    var name: String { self == .anthropic ? "Claude" : "OpenAI" }
+    var keyAccount: String { self == .anthropic ? AnthropicAPI.keyAccount : "openai-api-key" }
+    var keysURL: URL { URL(string: self == .anthropic ? "https://console.anthropic.com/settings/keys" : "https://platform.openai.com/api-keys")! }
+    var billingURL: URL { URL(string: self == .anthropic ? "https://console.anthropic.com/settings/billing" : "https://platform.openai.com/settings/organization/billing/")! }
+    var hasKey: Bool { (try? CredentialVault.read(keyAccount)) != nil }
+    /// Checks a key by listing the models it can use, newest first.
+    func models(key: String) async throws -> [String] {
+        self == .anthropic ? try await AnthropicAPI(apiKey: key).availableModels() : try await AgentAPI(apiKey: key).availableModels()
+    }
 }
 struct MemoryEntry: Identifiable, Codable {
     var id = UUID()
@@ -289,21 +367,22 @@ enum AgentEvent {
     }
 }
 
-struct SSEParser {
-    private(set) var rootTurnID: String?
+/// Splits a server-sent event stream into the data of each complete frame.
+struct ServerSentEvents {
+    var oversizeMessage = "La respuesta supera el tamaño esperado."
     private var dataLines: [String] = []
     private var lineBytes = Data()
-    mutating func feed(_ byte: UInt8) throws -> AgentEvent? {
+    mutating func feed(_ byte: UInt8) throws -> Data? {
         if byte == 10 {
             if lineBytes.last == 13 { lineBytes.removeLast() }
             let line = String(decoding: lineBytes, as: UTF8.self); lineBytes.removeAll(keepingCapacity: true)
             return append(line)
         }
         lineBytes.append(byte)
-        if lineBytes.count > 2_000_000 { throw AsterError.message("La respuesta supera el tamaño esperado. Recupera la sesión para consultar el resultado guardado.") }
+        if lineBytes.count > 2_000_000 { throw AsterError.message(oversizeMessage) }
         return nil
     }
-    mutating func append(_ line: String) -> AgentEvent? {
+    mutating func append(_ line: String) -> Data? {
         if line.isEmpty { return finish() }
         if line.hasPrefix("data:") {
             var value = String(line.dropFirst(5)); if value.hasPrefix(" ") { value.removeFirst() }
@@ -311,13 +390,23 @@ struct SSEParser {
         }
         return nil
     }
-    mutating func finish() -> AgentEvent? {
+    mutating func finish() -> Data {
         if !lineBytes.isEmpty {
             let line = String(decoding: lineBytes, as: UTF8.self); lineBytes.removeAll()
             if line.hasPrefix("data:") { dataLines.append(String(line.dropFirst(5)).trimmingCharacters(in: .whitespaces)) }
         }
         defer { dataLines = [] }
-        let data = Data(dataLines.joined(separator: "\n").utf8)
+        return Data(dataLines.joined(separator: "\n").utf8)
+    }
+}
+
+struct SSEParser {
+    private(set) var rootTurnID: String?
+    private var frames = ServerSentEvents(oversizeMessage: "La respuesta supera el tamaño esperado. Recupera la sesión para consultar el resultado guardado.")
+    mutating func feed(_ byte: UInt8) throws -> AgentEvent? { try frames.feed(byte).flatMap { decode($0) } }
+    mutating func append(_ line: String) -> AgentEvent? { frames.append(line).flatMap { decode($0) } }
+    mutating func finish() -> AgentEvent? { decode(frames.finish()) }
+    private mutating func decode(_ data: Data) -> AgentEvent? {
         if let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
             let turn = object["turn"] as? [String: Any]
             let subagent = object["subagent_id"] ?? turn?["subagent_id"]

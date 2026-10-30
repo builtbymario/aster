@@ -5,6 +5,7 @@ import SwiftUI
     var store: AsterStore!
     var window: NSWindow!
     var companions: DesktopCompanions!
+    var voiceShortcut: VoiceShortcut!
     var computerHUD: NSPanel!
     var coach: ScreenCoach!
     var lastTarget: NSRunningApplication?
@@ -14,9 +15,15 @@ import SwiftUI
             NSApplication.shared.applicationIconImage = icon
         }
         PortableSetup.importPreparedKey()
+        AsterLanguage.migrateStoredChoice()
         store = AsterStore()
         _ = store.remote
-        if (try? CredentialVault.read("openai-api-key")) == nil { store.page = "Conexiones" }
+        if store.needsOnboarding { store.onboarding = true }
+        else if !(store.settings.usesClaude ? AIProvider.anthropic : .openai).hasKey { store.page = "Conexiones" }
+        #if DEBUG
+        // Lets the welcome be reviewed on a Mac that is already set up.
+        if ProcessInfo.processInfo.environment["ASTER_ONBOARDING"] == "1" { store.onboarding = true }
+        #endif
         let view = MainView(showCompanion: { [weak self] in self?.showCompanion() }).environmentObject(store)
         window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1180, height: 830), styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView], backing: .buffered, defer: false)
         window.title = "Aster"; window.titlebarAppearsTransparent = true; window.titleVisibility = .hidden
@@ -24,7 +31,18 @@ import SwiftUI
         window.isOpaque = false; window.backgroundColor = .clear; window.titlebarSeparatorStyle = .none
         window.contentView = NSHostingView(rootView: view); window.setFrameAutosaveName("AsterMain"); if !window.setFrameUsingName("AsterMain") { window.center() }
         companions = DesktopCompanions(store: store, open: { [weak self] in self?.openMain() })
+        voiceShortcut = VoiceShortcut { [weak self] in self?.companions.dictate() }
+        store.applyVoiceShortcut = { [weak self] enabled in
+            if self?.voiceShortcut.setEnabled(enabled) == false { self?.store.notice = L("No se pudo registrar ⌥Espacio. Puede que otra app lo esté usando.") }
+        }
+        store.applyVoiceShortcut?(store.state.preferences.voiceShortcut != false)
         coach = ScreenCoach(store: store)
+        store.applyDesktopStyle = { [weak self] style in
+            self?.companions.setStyle(style)
+            if style == "island" { self?.coach.setFollowing(false) }
+        }
+        // The island replaces the companion that followed the cursor.
+        if companions.usesIsland { coach.setFollowing(false) }
         store.onOpenCoach = { [weak self] in self?.coach.show() }
         coach.prepareTarget = { [weak self] target in guard let self else { return }; if let target { self.lastTarget = target }; self.window.orderOut(nil); self.companions.suspend(); self.lastTarget?.activate(options: [.activateAllWindows]) }
         coach.restoreCompanions = { [weak self] in self?.companions.resume() }
@@ -41,12 +59,17 @@ import SwiftUI
             if let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication, app.processIdentifier != ProcessInfo.processInfo.processIdentifier { Task { @MainActor in self?.lastTarget = app } }
         }
         store.computer.onBegin = { [weak self] in guard let self else { return }; self.coach.suspend(); self.window.orderOut(nil); self.companions.suspend(); self.lastTarget?.activate(options: []); self.computerHUD.orderFrontRegardless() }
-        store.computer.onEnd = { [weak self] in guard let self else { return }; self.computerHUD.orderOut(nil); self.companions.resume(); self.coach.resume(); self.store.page = "Ordenador"; self.openMain() }
+        store.computer.onEnd = { [weak self] in
+            guard let self else { return }; self.computerHUD.orderOut(nil); self.companions.resume(); self.coach.resume()
+            // A finished task asked for in the quick chat returns there with its result; pauses need Computer.
+            if !self.store.computer.active, self.store.computerOwner != nil { self.companions.showChat(self.companions.currentMode); return }
+            self.store.page = "Ordenador"; self.openMain()
+        }
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
-        statusItem.button?.image = NSImage(systemSymbolName: "circle.dotted.circle.fill", accessibilityDescription: "Aster")
+        statusItem.button?.image = AsterGlyph.menuBar()
         let menu = NSMenu()
         menu.addItem(withTitle: "Abrir Aster", action: #selector(openMain), keyEquivalent: "").target = self
-        menu.addItem(withTitle: "Mostrar compañeros", action: #selector(showCompanion), keyEquivalent: "").target = self
+        menu.addItem(withTitle: "Mostrar Aster", action: #selector(showCompanion), keyEquivalent: "").target = self
         menu.addItem(withTitle: "Ordenar arriba a la derecha", action: #selector(arrangeCompanions), keyEquivalent: "").target = self
         menu.addItem(withTitle: "Minimizar compañeros", action: #selector(hideCompanions), keyEquivalent: "").target = self
         menu.addItem(withTitle: "Chat rápido", action: #selector(quickChat), keyEquivalent: "").target = self
@@ -64,13 +87,13 @@ import SwiftUI
         let windows = NSMenu(title: "Ventana"); let windowsRoot = NSMenuItem(title: "Ventana", action: nil, keyEquivalent: ""); windowsRoot.submenu = windows; mainMenu.addItem(windowsRoot)
         windows.addItem(withTitle: "Cerrar ventana", action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w")
         windows.addItem(withTitle: "Minimizar", action: #selector(NSWindow.performMiniaturize(_:)), keyEquivalent: "m")
-        windows.addItem(withTitle: "Mostrar compañeros", action: #selector(showCompanion), keyEquivalent: "").target = self
+        windows.addItem(withTitle: "Mostrar Aster", action: #selector(showCompanion), keyEquivalent: "").target = self
         windows.addItem(withTitle: "Ordenar arriba a la derecha", action: #selector(arrangeCompanions), keyEquivalent: "").target = self
         windows.addItem(withTitle: "Minimizar compañeros", action: #selector(hideCompanions), keyEquivalent: "").target = self
         let quickItem = windows.addItem(withTitle: "Chat rápido", action: #selector(quickChat), keyEquivalent: "j"); quickItem.target = self; quickItem.keyEquivalentModifierMask = [.command, .option]
         windows.addItem(withTitle: "A tu lado · ⌥⌘K", action: #selector(openCoach), keyEquivalent: "").target = self
         addChatMenu(to: windows)
-        let foldItem = windows.addItem(withTitle: "Plegar o desplegar equipo", action: #selector(toggleDesktop), keyEquivalent: "b"); foldItem.target = self; foldItem.keyEquivalentModifierMask = [.command, .option]
+        let foldItem = windows.addItem(withTitle: "Mostrar u ocultar Aster", action: #selector(toggleDesktop), keyEquivalent: "b"); foldItem.target = self; foldItem.keyEquivalentModifierMask = [.command, .option]
         windows.addItem(withTitle: "Mostrar Aster", action: #selector(openMain), keyEquivalent: "").target = self
         windows.addItem(withTitle: "Nueva misión", action: #selector(newMission), keyEquivalent: "n").target = self
         NSApplication.shared.windowsMenu = windows

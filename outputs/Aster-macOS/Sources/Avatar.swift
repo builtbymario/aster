@@ -2,7 +2,7 @@ import SwiftUI
 import AppKit
 
 enum AvatarForm: String, Codable, CaseIterable { case pebble = "Pebble", pill = "Pill", orbit = "Orbit" }
-enum AvatarMood: String, CaseIterable { case calm = "En calma", thinking = "Pensando", happy = "Contento", curious = "Curioso" }
+enum AvatarMood: String, CaseIterable { case calm = "En calma", listening = "Escuchando", thinking = "Pensando", speaking = "Hablando", happy = "Contento", curious = "Curioso" }
 enum AvatarTint: String, Codable, CaseIterable {
     case pearl = "Perla", lilac = "Lila", mint = "Menta", peach = "Melocotón", ink = "Tinta"
     var color: Color {
@@ -39,6 +39,9 @@ private struct GazeMotion {
     }
 }
 
+/// Aster: a white body with dark eyes and a luminous lavender ring floating beneath it.
+/// Its mood shows in the ring and the eyes: steady when calm, rippling while listening,
+/// dashed and turning while thinking, and a waveform while speaking.
 struct CompanionAvatar: View {
     var style: AvatarStyle
     var mood: AvatarMood = .calm
@@ -51,71 +54,17 @@ struct CompanionAvatar: View {
     @State private var hovering = false
     @State private var previousMood = AvatarMood.calm
     @State private var moodChanged: Double = 0
+    private var animated: Bool { style.motion && !reduceMotion && (animateAtRest || hovering || mood != .calm) }
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / framesPerSecond, paused: reduceMotion || !style.motion || !visible || (!animateAtRest && !hovering))) { timeline in
-            let time = reduceMotion || !style.motion || (!animateAtRest && !hovering) ? 0 : timeline.date.timeIntervalSinceReferenceDate
-            let seed = Double(AvatarTint.allCases.firstIndex(of: style.tint) ?? 0) * 0.71
+        TimelineView(.animation(minimumInterval: 1.0 / framesPerSecond, paused: !animated || !visible)) { timeline in
+            let time = animated ? timeline.date.timeIntervalSinceReferenceDate : 0
+            let progress = time == 0 || moodChanged == 0 ? 1 : min(1, max(0, (time - moodChanged) / 0.28))
+            let blend = progress * progress * (3 - 2 * progress)
+            let weight = { (candidate: AvatarMood) -> Double in (previousMood == candidate ? 1 - blend : 0) + (mood == candidate ? blend : 0) }
             let look = time == 0 ? CGPoint.zero : gaze.position(at: time)
-            let moodProgress = time == 0 || moodChanged == 0 ? 1 : min(1, max(0, (time - moodChanged) / 0.24))
-            let blend = moodProgress * moodProgress * (3 - 2 * moodProgress)
-            let happy = (previousMood == .happy ? 1.0 : 0) * (1 - blend) + (mood == .happy ? 1.0 : 0) * blend
-            let curious = (previousMood == .curious ? 1.0 : 0) * (1 - blend) + (mood == .curious ? 1.0 : 0) * blend
-            let thinking = (previousMood == .thinking ? 1.0 : 0) * (1 - blend) + (mood == .thinking ? 1.0 : 0) * blend
             Canvas(rendersAsynchronously: true) { context, size in
-                let unit = min(size.width, size.height)
-                let breathe = time == 0 ? 0 : sin(time * 1.65 + seed) * 0.014
-                let bob = time == 0 ? 0 : sin(time * 1.3 + seed) * unit * 0.018
-                let center = CGPoint(x: size.width / 2, y: size.height / 2 + bob)
-                let baseWidth = unit * (style.form == .pill ? 0.76 : 0.65)
-                let baseHeight = unit * (style.form == .pill ? 0.51 : style.form == .orbit ? 0.65 : 0.69)
-                let width = baseWidth * (1 + breathe), height = baseHeight * (1 - breathe)
-                let rect = CGRect(x: center.x - width / 2, y: center.y - height / 2, width: width, height: height)
-                let shadow = CGRect(x: center.x - baseWidth * 0.38, y: center.y + baseHeight * 0.55,
-                                    width: baseWidth * 0.76, height: unit * 0.025)
-                context.fill(Path(ellipseIn: shadow), with: .color(.black.opacity(0.055)))
-                if style.effects {
-                    for i in 0..<3 {
-                        let angle = time * 0.24 + Double(i) * 2.095
-                        let point = CGPoint(x: center.x + cos(angle) * unit * 0.44, y: center.y + sin(angle) * unit * 0.38)
-                        context.fill(Path(ellipseIn: CGRect(x: point.x, y: point.y, width: 3, height: 3)), with: .color(style.tint.color.opacity(0.6)))
-                    }
-                }
-                let shape: Path = style.form == .orbit ? Path(ellipseIn: rect) : Path(roundedRect: rect, cornerRadius: baseWidth * (style.form == .pill ? 0.45 : 0.36))
-                context.fill(shape, with: .linearGradient(Gradient(colors: [style.tint.color.opacity(0.8), style.tint.color]),
-                    startPoint: CGPoint(x: rect.minX, y: rect.minY), endPoint: CGPoint(x: rect.maxX, y: rect.maxY)))
-                context.stroke(shape, with: .color(.white.opacity(style.tint == .ink ? 0.09 : 0.45)), lineWidth: 1)
-                if style.form == .orbit && style.effects {
-                    var arc = Path()
-                    arc.addArc(center: center, radius: baseWidth * 0.61, startAngle: .degrees(time * 18), endAngle: .degrees(time * 18 + 200), clockwise: false)
-                    context.stroke(arc, with: .color(style.tint.color.opacity(0.4)), style: StrokeStyle(lineWidth: 1.5, lineCap: .round))
-                }
-                let blinkPhase = (time + seed).truncatingRemainder(dividingBy: 5.3)
-                let blink = time == 0 ? 0 : max(0, 1 - abs(blinkPhase - 5.15) / 0.10)
-                let lookX = look.x * unit * 0.035 + (time == 0 ? 0 : sin(time * 0.44 + seed) * unit * 0.012)
-                let eyeWidth = unit * 0.039
-                let eyeHeight = unit * (0.073 + curious * 0.012) * (1 - blink * 0.85)
-                for side in [-1.0, 1.0] {
-                    let eyeX = center.x + CGFloat(side) * unit * 0.095 + lookX
-                    let eyeY = center.y - unit * 0.025 + look.y * unit * 0.025
-                    let smileAmount = happy * (1 - blink)
-                    if smileAmount > 0 {
-                        var smile = Path()
-                        smile.move(to: CGPoint(x: eyeX - eyeWidth, y: eyeY + eyeWidth / 2))
-                        smile.addQuadCurve(to: CGPoint(x: eyeX + eyeWidth, y: eyeY + eyeWidth / 2), control: CGPoint(x: eyeX, y: eyeY - eyeWidth))
-                        context.stroke(smile, with: .color(style.tint.eyes.opacity(smileAmount)), style: StrokeStyle(lineWidth: unit * 0.022, lineCap: .round))
-                    }
-                    if smileAmount < 1 {
-                        let eye = CGRect(x: eyeX - eyeWidth / 2, y: eyeY - eyeHeight / 2, width: eyeWidth, height: eyeHeight)
-                        context.fill(Path(roundedRect: eye, cornerRadius: eyeWidth / 2), with: .color(style.tint.eyes.opacity(1 - smileAmount)))
-                    }
-                }
-                if thinking > 0 {
-                    for i in 0..<3 {
-                        let x = center.x + CGFloat(i - 1) * unit * 0.055
-                        let alpha = time == 0 ? 0.6 : 0.3 + 0.55 * (0.5 + 0.5 * sin(time * 3 - Double(i)))
-                        context.fill(Path(ellipseIn: CGRect(x: x, y: center.y + unit * 0.17, width: unit * 0.018, height: unit * 0.018)), with: .color(style.tint.eyes.opacity(alpha * thinking)))
-                    }
-                }
+                draw(in: &context, size: size, time: time, look: look, happy: weight(.happy), curious: weight(.curious),
+                     thinking: weight(.thinking), listening: weight(.listening), speaking: weight(.speaking))
             }
         }
         .frame(width: dimension, height: dimension)
@@ -130,7 +79,81 @@ struct CompanionAvatar: View {
         .background(WindowAnimationVisibility { visible = $0 })
         .onChange(of: mood) { old, _ in previousMood = old; moodChanged = Date().timeIntervalSinceReferenceDate }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Compañero \(style.form.rawValue), color \(style.tint.rawValue), \(mood.rawValue)")
+        .accessibilityLabel("Aster, \(mood.rawValue)")
+    }
+
+    private func draw(in context: inout GraphicsContext, size: CGSize, time: Double, look: CGPoint,
+                      happy: Double, curious: Double, thinking: Double, listening: Double, speaking: Double) {
+        let unit = min(size.width, size.height)
+        let float = time == 0 ? 0 : sin(time * 1.3) * unit * 0.02
+        let breathe = time == 0 ? 0 : sin(time * 1.65) * 0.012
+        let center = CGPoint(x: size.width / 2, y: size.height * 0.42 + float)
+        let width = unit * 0.60 * (1 + breathe), height = unit * 0.54 * (1 - breathe)
+        let body = CGRect(x: center.x - width / 2, y: center.y - height / 2, width: width, height: height)
+
+        // The ring floats a little out of phase with the body.
+        let ringCenter = CGPoint(x: size.width / 2, y: size.height * 0.85 + (time == 0 ? 0 : sin(time * 1.3 + 0.9) * unit * 0.01))
+        let line = max(1, unit * 0.028)
+        func ring(scale: Double) -> Path {
+            let w = unit * 0.56 * scale, h = unit * 0.11 * scale
+            return Path(ellipseIn: CGRect(x: ringCenter.x - w / 2, y: ringCenter.y - h / 2, width: w, height: h))
+        }
+        let pulse = time == 0 ? 0 : 0.5 + 0.5 * sin(time * 5)
+        let ringScale = 1 + 0.10 * listening * pulse
+        let ringOpacity = 1 - speaking * 0.85
+        if style.effects { context.stroke(ring(scale: ringScale), with: .color(.asterRing.opacity(0.14 * ringOpacity)), lineWidth: line * 4) }
+        if listening > 0 && time > 0 {
+            let ripple = (time * 0.9).truncatingRemainder(dividingBy: 1)
+            context.stroke(ring(scale: 1 + ripple * 0.45), with: .color(.asterRing.opacity((1 - ripple) * 0.55 * listening)), lineWidth: max(0.75, line * 0.6))
+        }
+        context.stroke(ring(scale: ringScale), with: .color(.asterRing.opacity((1 - thinking) * ringOpacity)), lineWidth: line)
+        if thinking > 0 {
+            context.stroke(ring(scale: 1), with: .color(.asterRing.opacity(thinking * ringOpacity)),
+                           style: StrokeStyle(lineWidth: line, lineCap: .round, dash: [unit * 0.05, unit * 0.035], dashPhase: time * unit * 0.12))
+        }
+        if speaking > 0 {
+            for index in 0..<5 {
+                let level = time == 0 ? 0.5 : abs(sin(time * 7 + Double(index) * 1.3))
+                let bar = unit * (0.035 + 0.075 * level)
+                let x = ringCenter.x + CGFloat(index - 2) * unit * 0.06
+                context.fill(Path(roundedRect: CGRect(x: x - unit * 0.016, y: ringCenter.y - bar / 2, width: unit * 0.032, height: bar), cornerRadius: unit * 0.016),
+                             with: .color(.asterRing.opacity(speaking)))
+            }
+        }
+
+        // Body: brand white in both appearances, with a lavender hairline.
+        let shape = Path(roundedRect: body, cornerRadius: height * 0.42, style: .continuous)
+        context.fill(shape, with: .linearGradient(Gradient(colors: [.asterBody, .asterBodyShade]), startPoint: CGPoint(x: body.midX, y: body.minY), endPoint: CGPoint(x: body.midX, y: body.maxY)))
+        context.stroke(shape, with: .color(Color(red: 0.686, green: 0.663, blue: 0.925).opacity(0.9)), lineWidth: max(0.75, unit * 0.012))
+
+        // Eyes look around, blink, and curve into a smile when happy or speaking.
+        let blinkPhase = time.truncatingRemainder(dividingBy: 5.3)
+        let blink = time == 0 ? 0 : max(0, 1 - abs(blinkPhase - 5.15) / 0.10)
+        let lookX = look.x * unit * 0.03 + (time == 0 ? 0 : sin(time * 0.44) * unit * 0.01) + thinking * unit * 0.02
+        let eyeWidth = unit * 0.055
+        let eyeHeight = unit * 0.10 * (1 + 0.15 * curious + 0.12 * listening) * (1 - blink * 0.85)
+        let smile = max(happy, speaking * 0.8) * (1 - blink)
+        for side in [-1.0, 1.0] {
+            let x = center.x + CGFloat(side) * unit * 0.105 + lookX
+            let y = center.y - unit * 0.01 + look.y * unit * 0.02 - thinking * unit * 0.018
+            if smile > 0 {
+                var arc = Path()
+                arc.move(to: CGPoint(x: x - eyeWidth, y: y + eyeWidth * 0.4))
+                arc.addQuadCurve(to: CGPoint(x: x + eyeWidth, y: y + eyeWidth * 0.4), control: CGPoint(x: x, y: y - eyeWidth * 1.1))
+                context.stroke(arc, with: .color(.asterInk.opacity(smile)), style: StrokeStyle(lineWidth: unit * 0.026, lineCap: .round))
+            }
+            if smile < 1 {
+                let eye = CGRect(x: x - eyeWidth / 2, y: y - eyeHeight / 2, width: eyeWidth, height: eyeHeight)
+                context.fill(Path(roundedRect: eye, cornerRadius: eyeWidth / 2), with: .color(.asterInk.opacity(1 - smile)))
+            }
+        }
+        if thinking > 0 {
+            for index in 0..<3 {
+                let alpha = time == 0 ? 0.6 : 0.3 + 0.6 * (0.5 + 0.5 * sin(time * 3 - Double(index)))
+                let x = center.x + CGFloat(index - 1) * unit * 0.05
+                context.fill(Path(ellipseIn: CGRect(x: x - unit * 0.011, y: center.y + unit * 0.125, width: unit * 0.022, height: unit * 0.022)), with: .color(.asterRing.opacity(alpha * thinking)))
+            }
+        }
     }
 }
 
@@ -148,5 +171,21 @@ private struct WindowAnimationVisibility: NSViewRepresentable {
             DispatchQueue.main.async { [weak self, weak window] in self?.changed?(window?.occlusionState.contains(.visible) == true) }
         }
         deinit { if let observer { NotificationCenter.default.removeObserver(observer) } }
+    }
+}
+
+enum AsterGlyph {
+    /// Menu bar template: the body with its eyes cut out and the ring floating beneath.
+    static func menuBar() -> NSImage {
+        let image = NSImage(size: NSSize(width: 18, height: 18), flipped: true) { _ in
+            let body = NSBezierPath(roundedRect: NSRect(x: 3.5, y: 2.5, width: 11, height: 9.5), xRadius: 4, yRadius: 4)
+            for x in [6.6, 9.8] { body.append(NSBezierPath(roundedRect: NSRect(x: x, y: 5.4, width: 1.6, height: 3.2), xRadius: 0.8, yRadius: 0.8)) }
+            body.windingRule = .evenOdd; NSColor.black.setFill(); body.fill()
+            let ring = NSBezierPath(ovalIn: NSRect(x: 4, y: 13.6, width: 10, height: 2.6)); ring.lineWidth = 1.2
+            NSColor.black.setStroke(); ring.stroke()
+            return true
+        }
+        image.isTemplate = true; image.accessibilityDescription = "Aster"
+        return image
     }
 }

@@ -14,7 +14,7 @@ struct TaskBoardView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-                HStack { VStack(alignment: .leading, spacing: 8) { Text(L("Ideas que avanzan.")).font(.system(size: 30, weight: .semibold, design: .rounded)); Text(L("Próximos pasos para ti y para tus empresas.")).font(.system(size: 12)).foregroundStyle(.secondary) }; Spacer(); GlassAction(title: section == "Avisos" ? "Nuevo aviso" : "Nueva tarea", symbol: "plus", prominent: true) { if section == "Avisos" { addingAlert = true } else { adding = true } }.opacity(section == "Apple" ? 0 : 1).disabled(section == "Apple") }
+                HStack { VStack(alignment: .leading, spacing: 8) { Text(L("Ideas que avanzan.")).font(.system(size: 30, weight: .semibold)); Text(L("Próximos pasos para ti y para tus empresas.")).font(.system(size: 12)).foregroundStyle(.secondary) }; Spacer(); GlassAction(title: section == "Avisos" ? "Nuevo aviso" : "Nueva tarea", symbol: "plus", prominent: true) { if section == "Avisos" { addingAlert = true } else { adding = true } }.opacity(section == "Apple" ? 0 : 1).disabled(section == "Apple") }
                 Picker(L("Listas"), selection: $section) { Text("Aster").tag("Aster"); Text("Apple").tag("Apple"); Text(L("Avisos")).tag("Avisos") }.pickerStyle(.segmented).frame(maxWidth: 330)
                 if section == "Aster" {
                 HStack {
@@ -81,14 +81,14 @@ struct TaskForm: View {
     init(initialCompanyID: UUID?) { _companyID = State(initialValue: initialCompanyID) }
     var body: some View {
         VStack(alignment: .leading, spacing: 21) {
-            HStack { Text(L("Un siguiente paso.")).font(.system(size: 26, weight: .semibold, design: .rounded)); Spacer(); GlassIconButton(symbol: "xmark", title: "Cerrar") { dismiss() } }
+            HStack { Text(L("Un siguiente paso.")).font(.system(size: 26, weight: .semibold)); Spacer(); GlassIconButton(symbol: "xmark", title: "Cerrar") { dismiss() } }
             TextField(L("¿Qué hay que hacer?"), text: $title, axis: .vertical).lineLimit(2...4).textFieldStyle(.roundedBorder)
             Picker(L("Empresa"), selection: $companyID) { Text(L("Personal")).tag(nil as UUID?); ForEach(store.companies) { Text($0.name).tag(Optional($0.id)) } }
-            Picker(L("Especialista"), selection: $agentID) { ForEach(store.state.specialists) { Text($0.name + " · " + L($0.role)).tag($0.id) } }
+            Picker(L("Modo"), selection: $agentID) { ForEach(store.state.specialists) { Text($0.mode + " · " + L($0.role)).tag($0.id) } }
             Toggle(L("Añadir fecha"), isOn: $hasDue).toggleStyle(.switch)
             if hasDue { DatePicker(L("Para el"), selection: $due, displayedComponents: .date) }
             HStack { Spacer(); GlassAction(title: "Guardar tarea", symbol: "checkmark", prominent: true) { store.addTask(title, companyID: companyID, specialistID: agentID, due: hasDue ? due : nil); dismiss() }.disabled(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) }
-        }.font(.system(size: 12)).padding(28).frame(width: 480).background(AmbientBackdrop(tint: store.agent.style.tint.color))
+        }.font(.system(size: 12)).padding(28).frame(width: 480).background(AmbientBackdrop(tint: Color.asterAccent))
     }
 }
 
@@ -100,13 +100,13 @@ struct AlertForm: View {
     @State private var recurrence = "none"
     var body: some View {
         VStack(alignment: .leading, spacing: 22) {
-            HStack { Text(L("Te lo recordaré.")).font(.system(size: 26, weight: .semibold, design: .rounded)); Spacer(); GlassIconButton(symbol: "xmark", title: "Cerrar") { dismiss() } }
+            HStack { Text(L("Te lo recordaré.")).font(.system(size: 26, weight: .semibold)); Spacer(); GlassIconButton(symbol: "xmark", title: "Cerrar") { dismiss() } }
             TextField(L("¿Qué quieres que te recuerde?"), text: $text, axis: .vertical).lineLimit(2...4).textFieldStyle(.roundedBorder)
             DatePicker(L("Cuándo"), selection: $date, in: Date()..., displayedComponents: [.date, .hourAndMinute])
             Picker(L("Repetir"), selection: $recurrence) { Text(L("Una vez")).tag("none"); Text(L("Cada día")).tag("daily"); Text(L("Cada semana")).tag("weekly") }
             Text(L("macOS entrega el aviso a la hora programada. Puedes verlo y cancelarlo en Tareas → Avisos.")).font(.system(size: 11)).foregroundStyle(.secondary).lineSpacing(4)
             HStack { Spacer(); GlassAction(title: "Guardar aviso", symbol: "bell.badge", prominent: true) { store.addAlert(text: text, date: date, recurrence: recurrence); dismiss() }.disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) }
-        }.font(.system(size: 12)).padding(28).frame(width: 490).background(AmbientBackdrop(tint: store.agent.style.tint.color))
+        }.font(.system(size: 12)).padding(28).frame(width: 490).background(AmbientBackdrop(tint: Color.asterAccent))
     }
 }
 
@@ -118,7 +118,7 @@ struct MemoryView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-                VStack(alignment: .leading, spacing: 8) { Text(L("Que te conozca mejor.")).font(.system(size: 30, weight: .semibold, design: .rounded)); Text(L("Tus preferencias, tu contexto y las cosas que merece recordar.")).font(.system(size: 12)).foregroundStyle(.secondary) }
+                VStack(alignment: .leading, spacing: 8) { Text(L("Que te conozca mejor.")).font(.system(size: 30, weight: .semibold)); Text(L("Tus preferencias, tu contexto y las cosas que merece recordar.")).font(.system(size: 12)).foregroundStyle(.secondary) }
                 VStack(alignment: .leading, spacing: 13) {
                     Text(L("Añadir un recuerdo")).font(.system(size: 14, weight: .semibold))
                     TextEditor(text: $text).font(.system(size: 13)).scrollContentBackground(.hidden).frame(height: 85).padding(10).background(.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 12))
@@ -149,10 +149,10 @@ struct MemoryEditor: View {
     @State var entry: MemoryEntry
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
-            Text(L("Editar recuerdo")).font(.system(size: 24, weight: .semibold, design: .rounded))
+            Text(L("Editar recuerdo")).font(.system(size: 24, weight: .semibold))
             TextEditor(text: $entry.text).font(.system(size: 13)).frame(height: 180).scrollContentBackground(.hidden).padding(12).frostedSurface(16)
             HStack { Button(L("Cancelar")) { dismiss() }; Spacer(); GlassAction(title: "Guardar", symbol: "checkmark", prominent: true) { store.updateMemory(entry); dismiss() }.disabled(entry.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) }
-        }.padding(26).frame(width: 480).background(AmbientBackdrop(tint: store.agent.style.tint.color))
+        }.padding(26).frame(width: 480).background(AmbientBackdrop(tint: Color.asterAccent))
     }
 }
 
@@ -164,10 +164,10 @@ struct RenameMissionView: View {
     init(mission: Mission) { self.mission = mission; _title = State(initialValue: mission.title) }
     var body: some View {
         VStack(alignment: .leading, spacing: 21) {
-            Text(L("Renombrar misión")).font(.system(size: 24, weight: .semibold, design: .rounded))
+            Text(L("Renombrar misión")).font(.system(size: 24, weight: .semibold))
             TextField(L("Nombre"), text: $title).textFieldStyle(.roundedBorder)
             HStack { Button(L("Cancelar")) { dismiss() }; Spacer(); GlassAction(title: "Guardar", symbol: "checkmark", prominent: true) { store.renameMission(mission.id, title: title); dismiss() }.disabled(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) }
-        }.padding(26).frame(width: 460).background(AmbientBackdrop(tint: store.agent.style.tint.color))
+        }.padding(26).frame(width: 460).background(AmbientBackdrop(tint: Color.asterAccent))
     }
 }
 
@@ -176,6 +176,6 @@ struct WorkspaceEmpty: View {
     var title: String
     var detail: String
     var body: some View {
-        VStack(spacing: 14) { Image(systemName: symbol).font(.system(size: 28, weight: .light)).foregroundStyle(.secondary); Text(L(title)).font(.system(size: 20, weight: .medium, design: .rounded)); Text(L(detail)).font(.system(size: 12)).foregroundStyle(.secondary).multilineTextAlignment(.center).lineSpacing(4).frame(maxWidth: 400) }.padding(36).frame(maxWidth: .infinity, maxHeight: .infinity)
+        VStack(spacing: 14) { Image(systemName: symbol).font(.system(size: 28, weight: .light)).foregroundStyle(.secondary); Text(L(title)).font(.system(size: 20, weight: .medium)); Text(L(detail)).font(.system(size: 12)).foregroundStyle(.secondary).multilineTextAlignment(.center).lineSpacing(4).frame(maxWidth: 400) }.padding(36).frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }

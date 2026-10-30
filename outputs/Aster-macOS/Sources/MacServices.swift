@@ -107,7 +107,12 @@ extension AsterStore {
     }
     func handleTool(_ session: String, call: PendingToolCall, missionID: UUID) async throws -> String {
         if let receipt = state.toolReceipts.first(where: { $0.sessionID == session && $0.turnID == call.turnID && $0.callID == call.callID }) { return receipt.output }
-        guard ["aster_mail", "aster_calendar", "aster_reminders", "aster_notify", "aster_health"].contains(call.name) else { return try performTool(session, call: call, missionID: missionID) }
+        guard ["aster_mail", "aster_calendar", "aster_reminders", "aster_notify", "aster_health", "aster_computer", "aster_notes", "aster_mission"].contains(call.name) else { return try performTool(session, call: call, missionID: missionID) }
+        // Reading mail, calendars, reminders or notes brings in text written by others.
+        let operation = call.arguments["operation"] as? String ?? ""
+        if call.name == "aster_mail" && operation != "draft" || call.name == "aster_notes" && operation != "create" || ["aster_calendar", "aster_reminders"].contains(call.name) && !["create", "complete"].contains(operation) {
+            exposedConversations.insert(missionID)
+        }
         var output: [String: Any] = [:]
         switch call.name {
         case "aster_health":
@@ -115,12 +120,39 @@ extension AsterStore {
             output = ["imported_at": health.imported.formatted(.iso8601), "live": false, "record_count": health.recordCount, "latest_records": health.metrics.map { ["type": $0.id, "label": $0.label, "value": $0.value, "unit": $0.unit, "date": $0.date.formatted(.iso8601), "source": $0.source] }]
         case "aster_mail":
             guard state.preferences.watchMail else { throw AsterError.message("Conecta Apple Mail en Ajustes para consultar el correo. No hace falta pegarlo en el chat.") }
+            if call.arguments["operation"] as? String == "draft" {
+                let to = call.arguments["to"] as? [String] ?? [], cc = call.arguments["cc"] as? [String] ?? []
+                let subject = call.arguments["subject"] as? String ?? "", body = call.arguments["body"] as? String ?? ""
+                guard !(to.isEmpty && subject.isEmpty && body.isEmpty) else { throw AsterError.message("El borrador necesita destinatario, asunto o texto.") }
+                setActivity("Preparando el borrador en Mail", for: missionID)
+                try await mailDrafter(to, cc, subject, body)
+                output = ["draft_opened": true, "sent": false, "to": to, "cc": cc, "subject": subject, "note": "The draft is open in Mail for the user to review and send."]
+                break
+            }
             setActivity("Leyendo Apple Mail", for: missionID)
             let items = try await AppleMailReader.read(operation: call.arguments["operation"] as? String ?? "latest", query: call.arguments["query"] as? String ?? "", messageID: call.arguments["message_id"] as? String ?? "", limit: call.arguments["limit"] as? Int ?? 5)
             output["messages"] = items.map { ["id": $0.id, "subject": $0.subject, "sender": $0.sender, "received": $0.received.formatted(.iso8601), "body": $0.body ?? ""] }
             output["source"] = "Apple Mail · inbox · live"; mailStatus = "Conectado"
         case "aster_calendar":
             guard state.preferences.watchCalendar, EKEventStore.authorizationStatus(for: .event) == .fullAccess else { throw AsterError.message("Conecta Calendarios de macOS en Ajustes y permite el acceso.") }
+            if call.arguments["operation"] as? String == "create" {
+                guard let title = call.arguments["title"] as? String, !title.isEmpty, let start = (call.arguments["start"] as? String).flatMap(Self.parseDate) else {
+                    throw AsterError.message("El evento necesita un título y una fecha de inicio ISO 8601 con zona horaria.")
+                }
+                let end = (call.arguments["end"] as? String).flatMap(Self.parseDate) ?? start.addingTimeInterval(3600)
+                guard end > start else { throw AsterError.message("El evento debe terminar después de empezar.") }
+                guard let target = calendar.defaultCalendarForNewEvents else { throw AsterError.message("No hay un calendario disponible para nuevos eventos.") }
+                // The tool identity makes a repeated call update the same event instead of duplicating it.
+                let token = URL(string: "aster://event/" + Self.toolIdentity(session, call: call))!
+                let window = calendar.predicateForEvents(withStart: start.addingTimeInterval(-86400 * 7), end: end.addingTimeInterval(86400 * 7), calendars: nil)
+                let event = calendar.events(matching: window).first { $0.url == token } ?? EKEvent(eventStore: calendar)
+                event.title = String(title.prefix(300)); event.startDate = start; event.endDate = end; event.url = token
+                event.location = call.arguments["location"] as? String; event.notes = call.arguments["notes"] as? String
+                if event.calendar == nil { event.calendar = target }
+                try calendar.save(event, span: .thisEvent, commit: true)
+                output = ["created": true, "title": event.title ?? "", "start": start.formatted(.iso8601), "end": end.formatted(.iso8601), "calendar": event.calendar.title, "invitations_sent": false]
+                break
+            }
             let days = min(30, max(1, call.arguments["days"] as? Int ?? 1)), start = Date()
             let predicate = calendar.predicateForEvents(withStart: start, end: start.addingTimeInterval(Double(days) * 86400), calendars: nil)
             output["events"] = calendar.events(matching: predicate).sorted { $0.startDate < $1.startDate }.prefix(100).map { ["title": $0.title ?? "", "start": $0.startDate.formatted(.iso8601), "end": $0.endDate.formatted(.iso8601), "calendar": $0.calendar.title, "location": $0.location ?? ""] }
@@ -143,6 +175,64 @@ extension AsterStore {
                 output["reminders"] = items.filter { !$0.isCompleted && (query.isEmpty || ($0.title ?? "").localizedCaseInsensitiveContains(query)) }.prefix(100).map { ["id": $0.calendarItemIdentifier, "title": $0.title ?? "", "notes": $0.notes ?? "", "list": $0.calendar.title, "due": $0.dueDateComponents.flatMap { Calendar.current.date(from: $0) }?.formatted(.iso8601) ?? ""] }
             }
             await refreshReminders()
+        case "aster_notes":
+            guard state.preferences.watchNotes == true else { throw AsterError.message("Conecta Apple Notas en Ajustes para consultar y crear notas.") }
+            switch call.arguments["operation"] as? String ?? "search" {
+            case "read":
+                guard let id = call.arguments["id"] as? String, !id.isEmpty else { throw AsterError.message("Indica qué nota abrir.") }
+                setActivity("Leyendo Apple Notas", for: missionID)
+                let note = try await AppleNotes.read(id)
+                output = ["id": note.id, "title": note.title, "modified": note.modified?.formatted(.iso8601) ?? "", "text": note.text ?? ""]
+            case "create":
+                guard let title = call.arguments["title"] as? String, !title.isEmpty else { throw AsterError.message("La nota necesita un título.") }
+                setActivity("Creando la nota", for: missionID)
+                let id = try await AppleNotes.create(title: title, body: String((call.arguments["body"] as? String ?? "").prefix(50000)))
+                output = ["created": true, "id": id, "title": title]
+            default:
+                setActivity("Buscando en Apple Notas", for: missionID)
+                let notes = try await AppleNotes.search(call.arguments["query"] as? String ?? "", limit: call.arguments["limit"] as? Int ?? 10)
+                output["notes"] = notes.map { ["id": $0.id, "title": $0.title, "modified": $0.modified?.formatted(.iso8601) ?? ""] }
+            }
+        case "aster_mission":
+            let brief = (call.arguments["brief"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            let kickoff = call.arguments["kickoff"] as? Bool == true
+            try await approveIfExposed(missionID, action: L(kickoff ? "arrancar una startup completa" : "lanzar esta misión"), detail: kickoff ? (call.arguments["company"] as? String ?? "") : brief)
+            var company: Company?
+            if let name = (call.arguments["company"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines), !name.isEmpty {
+                company = companies.first { $0.name.localizedCaseInsensitiveCompare(name) == .orderedSame }
+                if company == nil {
+                    createCompany(name: String(name.prefix(120)), goal: String((brief.isEmpty ? name : brief).prefix(600)))
+                    company = companies.first { $0.name == String(name.prefix(120)) }
+                }
+            }
+            let started: Bool
+            if kickoff {
+                guard let company else { throw AsterError.message("Indica el nombre de la empresa para arrancar la startup.") }
+                started = launchStartup(company.id, background: true)
+            } else {
+                guard !brief.isEmpty else { throw AsterError.message("Describe qué debe entregar la misión.") }
+                let mode = (call.arguments["mode"] as? String).flatMap { id in state.specialists.first { $0.id == id }?.id } ?? "director"
+                started = run(String(brief.prefix(20000)), companyID: company?.id, fresh: true, specialistID: mode, background: true)
+            }
+            guard started, let mission = state.missions.first else { throw AsterError.message("Ahora hay demasiados trabajos en marcha. Inténtalo cuando termine alguno.") }
+            if let index = state.missions.firstIndex(where: { $0.id == mission.id }) {
+                if let title = call.arguments["title"] as? String, !title.isEmpty { state.missions[index].title = String(title.prefix(70)) }
+                state.missions[index].parentChat = missionID
+            }
+            output = ["started": true, "mission_id": mission.id.uuidString, "mode": mission.specialistID, "company": company?.name ?? "", "kickoff": kickoff,
+                      "note": "The mission runs in the background; its result and files appear in Aster's Missions and Inbox."]
+        case "aster_computer":
+            guard let task = (call.arguments["task"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines), !task.isEmpty else { throw AsterError.message("Describe la tarea que hay que hacer en el Mac.") }
+            guard !computer.active else { throw AsterError.message("El Mac ya está haciendo otra tarea. Espera a que termine o detenla en Ordenador.") }
+            try await approveIfExposed(missionID, action: L("hacer esta tarea en tu Mac"), detail: task)
+            let mode = state.missions.first { $0.id == missionID }.flatMap { mission in state.specialists.first { $0.id == mission.specialistID } } ?? agent
+            setActivity("Trabajando en tu Mac", for: missionID); computerOwner = missionID
+            defer { computerOwner = nil }
+            guard let run = await computerRunner(String(task.prefix(4000)), mode, settings) else {
+                throw AsterError.message(computer.error.isEmpty ? "No se ha podido empezar la tarea en el Mac." : computer.error)
+            }
+            output = ["status": run.status, "result": run.result, "steps": run.steps.suffix(24).map(\.text),
+                      "not_done": run.steps.filter { ["denied", "blocked"].contains($0.action) }.map(\.text)]
         case "aster_notify":
             guard let text = call.arguments["text"] as? String, !text.isEmpty, let value = call.arguments["date"] as? String, let date = Self.parseDate(value) else { throw AsterError.message("El aviso necesita un texto y una fecha ISO 8601 con zona horaria.") }
             let recurrence = call.arguments["recurrence"] as? String ?? "none"

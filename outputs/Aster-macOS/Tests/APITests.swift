@@ -1,4 +1,6 @@
 import Foundation
+import XCTest
+@testable import Aster
 
 final class MockAgentProtocol: URLProtocol {
     static var handler: (URLRequest) throws -> (Int, [String: Any]) = { _ in (500, [:]) }
@@ -15,9 +17,11 @@ final class MockAgentProtocol: URLProtocol {
     }
     override func stopLoading() {}
 }
-@main struct APITests {
-    static func check(_ condition: @autoclosure () -> Bool, _ message: String) { if !condition() { fatalError(message) } }
-    static func main() async throws {
+final class APITests: XCTestCase {
+    /// Public API headers, model access, exact-turn pagination and recovery, worker isolation, artifact ownership, cancellation, quota errors and pending function actions.
+    func testAgentsAPIClient() async throws { try await Self.run() }
+    static func check(_ condition: @autoclosure () -> Bool, _ message: String = "", file: StaticString = #filePath, line: UInt = #line) { XCTAssertTrue(condition(), message, file: file, line: line) }
+    static func run() async throws {
         var settings = IntelligenceSettings(); settings.delegation = true; settings.maxAgents = 3
         for specialist in Specialist.defaults {
             let configuration = AgentAPI.configuration(for: specialist, settings: settings)
@@ -56,7 +60,7 @@ final class MockAgentProtocol: URLProtocol {
         check(restored.0 == "completed" && restored.1 == "Primero\n\nSegundo párrafo", "Recovery follows pagination and isolates root output of the exact turn")
         check(requests.count == 4, "Both turns and items must follow pagination")
         MockAgentProtocol.handler = { _ in (200, ["data": [["id": "different-turn", "status": "completed"]], "has_more": false]) }
-        do { _ = try await api.recover("session", turnID: "missing-turn"); fatalError("Must not substitute an unrelated turn") } catch {}
+        do { _ = try await api.recover("session", turnID: "missing-turn"); XCTFail("Must not substitute an unrelated turn") } catch {}
         MockAgentProtocol.handler = { request in
             if request.url?.query?.contains("after=") == true { return (200, ["data": [["id": "new", "path": "/workspace/outputs/new.md", "turn_id": "intended"]], "has_more": false]) }
             return (200, ["data": [["id": "old", "path": "/workspace/outputs/old.md", "turn_id": "old-turn"]], "has_more": true, "last_id": "artifact-cursor"])
@@ -74,9 +78,8 @@ final class MockAgentProtocol: URLProtocol {
         }
         try await api.cancel("sid")
         MockAgentProtocol.handler = { _ in (429, ["error": ["code": "usage_limit_exceeded", "message": "Billing limit"]]) }
-        do { _ = try await api.availableModels(); fatalError("Quota failure must not report success") } catch { check(error.localizedDescription.contains("facturación"), "API failure is actionable") }
+        do { _ = try await api.availableModels(); XCTFail("Quota failure must not report success") } catch { check(error.localizedDescription.contains("facturación"), "API failure is actionable") }
         let data = Data(#"{"type":"agent.session.requires_action","session":{"id":"s","required_actions":[{"type":"function_call","turn_id":"t","call_id":"c","name":"aster_create_task","arguments":{"title":"Propuesta"}}]}}"#.utf8)
-        if case .actions(let sid, let actions)? = AgentEvent.decode(data) { check(sid == "s" && actions.count == 1 && actions[0].arguments["title"] as? String == "Propuesta", "Required actions decode the public function contract") } else { fatalError("Function call must reach responder") }
-        print("PASS: public API headers, model access, exact-turn pagination and recovery, worker isolation, artifact ownership, cancellation, quota errors and pending function actions.")
+        if case .actions(let sid, let actions)? = AgentEvent.decode(data) { check(sid == "s" && actions.count == 1 && actions[0].arguments["title"] as? String == "Propuesta", "Required actions decode the public function contract") } else { XCTFail("Function call must reach responder") }
     }
 }

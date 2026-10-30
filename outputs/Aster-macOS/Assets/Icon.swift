@@ -10,20 +10,25 @@ for size in [16, 32, 64, 128, 256, 512, 1024] {
     let scale = CGFloat(size) / 512
     NSGraphicsContext.current?.imageInterpolation = .high
     let transform = NSAffineTransform(); transform.scale(by: scale); transform.concat()
+    // Aster: a white body with dark eyes and a luminous lavender ring, on a near-black tile.
+    let lavender = NSColor(srgbRed: 0.686, green: 0.663, blue: 0.925, alpha: 1)
     let tile = NSBezierPath(roundedRect: NSRect(x: 14, y: 14, width: 484, height: 484), xRadius: 108, yRadius: 108)
-    NSGradient(starting: NSColor(white: 0.045, alpha: 1), ending: NSColor(white: 0.16, alpha: 1))!.draw(in: tile, angle: 80)
-    NSColor(white: 1, alpha: 0.16).setStroke(); tile.lineWidth = 2; tile.stroke()
+    NSGradient(starting: NSColor(srgbRed: 0.055, green: 0.055, blue: 0.067, alpha: 1), ending: NSColor(srgbRed: 0.11, green: 0.106, blue: 0.137, alpha: 1))!.draw(in: tile, angle: 90)
+    NSColor(white: 1, alpha: 0.10).setStroke(); tile.lineWidth = 2; tile.stroke()
+    let ring = NSBezierPath(ovalIn: NSRect(x: 130, y: 104, width: 252, height: 52))
+    lavender.withAlphaComponent(0.18).setStroke(); ring.lineWidth = 34; ring.stroke()
     NSGraphicsContext.saveGraphicsState()
-    let shadow = NSShadow(); shadow.shadowColor = NSColor.black.withAlphaComponent(0.45); shadow.shadowBlurRadius = 24; shadow.shadowOffset = NSSize(width: 0, height: -14); shadow.set()
-    let body = NSBezierPath(roundedRect: NSRect(x: 127, y: 116, width: 258, height: 280), xRadius: 99, yRadius: 99)
-    NSGradient(starting: NSColor(white: 0.83, alpha: 1), ending: NSColor(white: 0.99, alpha: 1))!.draw(in: body, angle: 75)
+    let glow = NSShadow(); glow.shadowColor = lavender.withAlphaComponent(0.9); glow.shadowBlurRadius = 22; glow.shadowOffset = .zero; glow.set()
+    lavender.setStroke(); ring.lineWidth = 11; ring.stroke()
     NSGraphicsContext.restoreGraphicsState()
-    NSColor(white: 1, alpha: 0.85).setStroke(); body.lineWidth = 2; body.stroke()
-    NSColor(white: 0.09, alpha: 1).setFill()
-    for x in [208.0, 286.0] { NSBezierPath(roundedRect: NSRect(x: x, y: 250, width: 18, height: 36), xRadius: 9, yRadius: 9).fill() }
-    let star = NSBezierPath(); star.move(to: NSPoint(x: 412, y: 431))
-    for point in [NSPoint(x: 419, y: 412), NSPoint(x: 438, y: 405), NSPoint(x: 419, y: 398), NSPoint(x: 412, y: 379), NSPoint(x: 405, y: 398), NSPoint(x: 386, y: 405), NSPoint(x: 405, y: 412)] { star.line(to: point) }
-    star.close(); NSColor(white: 0.93, alpha: 1).setFill(); star.fill()
+    NSGraphicsContext.saveGraphicsState()
+    let shadow = NSShadow(); shadow.shadowColor = NSColor.black.withAlphaComponent(0.5); shadow.shadowBlurRadius = 26; shadow.shadowOffset = NSSize(width: 0, height: -12); shadow.set()
+    let body = NSBezierPath(roundedRect: NSRect(x: 136, y: 196, width: 240, height: 216), xRadius: 91, yRadius: 91)
+    NSGradient(starting: NSColor(srgbRed: 0.937, green: 0.933, blue: 0.984, alpha: 1), ending: .white)!.draw(in: body, angle: 90)
+    NSGraphicsContext.restoreGraphicsState()
+    lavender.setStroke(); body.lineWidth = 3; body.stroke()
+    NSColor(srgbRed: 0.118, green: 0.106, blue: 0.227, alpha: 1).setFill()
+    for x in [203.0, 287.0] { NSBezierPath(roundedRect: NSRect(x: x, y: 286, width: 22, height: 42), xRadius: 11, yRadius: 11).fill() }
     NSGraphicsContext.restoreGraphicsState()
     let png = bitmap.representation(using: .png, properties: [:])!
     let names: [String]

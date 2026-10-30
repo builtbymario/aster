@@ -1,8 +1,12 @@
 import Foundation
+import XCTest
+@testable import Aster
 
-@main struct CompanionTests {
-    static func check(_ condition: @autoclosure () -> Bool, _ message: String) { if !condition() { fatalError(message) } }
-    @MainActor static func main() async throws {
+final class CompanionTests: XCTestCase {
+    /// Parallel streams and identities, late-event isolation, independent completion, capacity, routine durable claims/no replay/failure pause, background focus, DST/weekdays, legacy state, bounded drawing and screen annotation validation. No network or native input.
+    @MainActor func testParallelMissionsRoutinesAndAnnotations() async throws { try await Self.run() }
+    static func check(_ condition: @autoclosure () -> Bool, _ message: String = "", file: StaticString = #filePath, line: UInt = #line) { XCTAssertTrue(condition(), message, file: file, line: line) }
+    @MainActor static func run() async throws {
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent("aster-companion-" + UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: folder) }
         let store = AsterStore(directory: folder, startServices: false, apiFactory: { throw AsterError.message("Connection fixture") })
@@ -55,12 +59,11 @@ import Foundation
         var action = DesktopAction(action: "drag", explanation: "Draw the requested line", path: [.init(x: 10, y: 10), .init(x: 1500, y: 800)])
         try action.validate(geometry: geometry, active: true)
         action.path = [.init(x: 10, y: 10), .init(x: 1600, y: 10)]
-        do { try action.validate(geometry: geometry, active: true); fatalError("Offscreen drag should fail") } catch {}
+        do { try action.validate(geometry: geometry, active: true); XCTFail("Offscreen drag should fail") } catch {}
         let valid = CoachAnswer(answer: "This is a teaching annotation", marks: [.init(kind: "arrow", points: [.init(x: 0.1, y: 0.2), .init(x: 0.4, y: 0.5)], label: "Target")]); try valid.validate()
         for mark in [ScreenMark(kind: "arrow", points: [.init(x: -0.1, y: 0)], label: ""), ScreenMark(kind: "line", points: [.init(x: .nan, y: 0), .init(x: 0, y: 0)], label: ""), ScreenMark(kind: "execute", points: [.init(x: 0, y: 0)], label: "")] {
-            do { try mark.validate(); fatalError("Invalid marks must be rejected") } catch {}
+            do { try mark.validate(); XCTFail("Invalid marks must be rejected") } catch {}
         }
-        do { _ = try CoachAnswer.decode(["status": "incomplete", "output": []]); fatalError("Incomplete model responses are not success") } catch {}
-        print("PASS: parallel streams and identities, late-event isolation, independent completion, capacity, routine durable claims/no replay/failure pause, background focus, DST/weekdays, legacy state, bounded drawing and screen annotation validation. No network or native input.")
+        do { _ = try CoachAnswer.decode(["status": "incomplete", "output": []]); XCTFail("Incomplete model responses are not success") } catch {}
     }
 }

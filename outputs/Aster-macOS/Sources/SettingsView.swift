@@ -16,7 +16,7 @@ struct SettingsView: View {
             VStack(alignment: .leading, spacing: 20) {
                 HStack(alignment: .top) {
                     VStack(alignment: .leading, spacing: 8) {
-                        Text(L("Aster, a tu manera.")).font(.system(size: 30, weight: .semibold, design: .rounded)).tracking(-0.8)
+                        Text(L("Aster, a tu manera.")).font(.system(size: 30, weight: .semibold)).tracking(-0.8)
                         Text(L("Elige cómo piensa, cómo habla y cuándo trabaja.")).font(.system(size: 12)).foregroundStyle(.secondary)
                     }
                     Spacer(); GlassAction(title: "Restaurar copia", symbol: "square.and.arrow.down", action: store.importWorkspace); GlassAction(title: "Guardar copia", symbol: "square.and.arrow.up", action: store.exportWorkspace)
@@ -27,26 +27,32 @@ struct SettingsView: View {
                 else if tab == "Conexiones" { connections }
                 else { autonomy }
             }.padding(.horizontal, 22).padding(.top, 9).padding(.bottom, 28)
-        }.scrollIndicators(.hidden).onAppear { if (try? CredentialVault.read("openai-api-key")) == nil { tab = "Conexiones" } }
+        }.scrollIndicators(.hidden).onAppear { if !(store.settings.usesClaude ? AIProvider.anthropic : .openai).hasKey { tab = "Conexiones" } }
     }
     private var intelligence: some View {
         VStack(spacing: 18) {
             card("Su forma de pensar", icon: "sparkle") {
-                let models = ["gpt-6-astra", "gpt-6.1-sol", "gpt-6-sol", "gpt-6-luna", "gpt-5.4-mini"].filter { store.availableModels.isEmpty || store.availableModels.contains($0) || $0 == store.settings.model }
-                Picker(L("Modelo"), selection: option(\.model)) { ForEach(models, id: \.self) { Text($0).tag($0) } }
+                ModelPicker()
                 Picker(L("Profundidad"), selection: option(\.effort)) { Text(L("Rápido")).tag("low"); Text(L("Equilibrado")).tag("medium"); Text(L("Profundo")).tag("high") }
                 Text(L("Más profundidad puede mejorar tareas complejas y aumentar el tiempo y el consumo. Los cambios se aplican en el próximo envío.")).font(.system(size: 11)).foregroundStyle(.secondary).lineSpacing(4)
+                if store.settings.usesClaude {
+                    Text(L("Claude usa este modelo para el chat, las misiones, el control del Mac y tu pantalla. El chat responde en modo rápido; las misiones, con la profundidad elegida.")).font(.system(size: 11)).foregroundStyle(.secondary).lineSpacing(4)
+                } else {
+                    let quickModels = AIProvider.chatModels(store.availableModels, provider: .openai, keeping: store.settings.quickModel ?? store.settings.model)
+                    Picker(L("Modelo del chat rápido"), selection: Binding(get: { store.settings.quickModel ?? store.settings.model }, set: { value in var settings = store.settings; settings.quickModel = value; store.settings = settings })) { ForEach(quickModels, id: \.self) { Text($0).tag($0) } }
+                    Text(L("Los compañeros del escritorio responden al momento con este modelo y Aster guarda la conversación en tu Mac. Las misiones usan el entorno completo de agentes, con archivos y especialistas.")).font(.system(size: 11)).foregroundStyle(.secondary).lineSpacing(4)
+                }
                 Toggle(L("Investigar en internet"), isOn: option(\.webSearch)).toggleStyle(.switch)
                 Toggle(L("Permitir que Aster coordine especialistas"), isOn: option(\.delegation)).toggleStyle(.switch)
                 if store.settings.delegation { Stepper(LF("Hasta %d especialistas a la vez", store.settings.maxAgents), value: option(\.maxAgents), in: 1...5) }
                 Stepper(LF("Tiempo máximo por misión: %d min", store.settings.maxMinutes), value: option(\.maxMinutes), in: 1...60)
-                Text(L("Aster solicita la cancelación al alcanzar este tiempo mientras la app está abierta. No es un límite monetario de OpenAI.")).font(.system(size: 10)).foregroundStyle(.secondary).lineSpacing(4)
+                Text(LF("Aster solicita la cancelación al alcanzar este tiempo mientras la app está abierta. No es un límite de gasto de %@.", store.settings.providerName)).font(.system(size: 10)).foregroundStyle(.secondary).lineSpacing(4)
             }
             card("Idioma y personalidad", icon: "bubble.left.and.bubble.right") {
                 Picker(L("Idioma de la interfaz"), selection: $language) { ForEach(AsterLanguage.allCases, id: \.rawValue) { Text($0.name).tag($0.rawValue) } }
                 Picker(L("Idioma de las respuestas"), selection: option(\.responseLanguage)) {
                     Text(L("El de mi mensaje")).tag("auto")
-                    ForEach([("es", "Español"), ("en", "English"), ("ca", "Català"), ("fr", "Français"), ("de", "Deutsch"), ("it", "Italiano"), ("pt", "Português"), ("ja", "日本語"), ("zh", "中文")], id: \.0) { Text($0.1).tag($0.0) }
+                    ForEach([("es", "Español"), ("en", "English"), ("fr", "Français"), ("de", "Deutsch"), ("it", "Italiano"), ("pt", "Português"), ("ja", "日本語"), ("zh", "中文")], id: \.0) { Text($0.1).tag($0.0) }
                 }
                 Picker(L("Tono"), selection: option(\.tone)) { Text(L("Cercano")).tag("warm"); Text(L("Directo")).tag("direct"); Text(L("Profesional")).tag("professional"); Text(L("Creativo")).tag("creative") }
                 Picker(L("Detalle"), selection: option(\.detail)) { Text(L("Breve")).tag("brief"); Text(L("Equilibrado")).tag("balanced"); Text(L("Exhaustivo")).tag("detailed") }
@@ -59,21 +65,25 @@ struct SettingsView: View {
                 Toggle(L("Recordar cuando se lo pida"), isOn: option(\.automaticMemory)).toggleStyle(.switch)
                 Text(L("Puedes ver, editar y eliminar los recuerdos en Memoria. Aster no guarda automáticamente cada conversación como un recuerdo.")).font(.system(size: 11)).foregroundStyle(.secondary).lineSpacing(4)
                 Toggle(L("Compartir resúmenes de agenda y correo con la IA"), isOn: option(\.shareSources)).toggleStyle(.switch)
-                Text(L("Al activarlo, los asuntos y remitentes de correo y los títulos y horarios de citas ya revisados se envían a OpenAI con tus misiones. Las fuentes se conectan por separado.")).font(.system(size: 10)).foregroundStyle(.secondary).lineSpacing(4)
+                Text(LF("Al activarlo, los asuntos y remitentes de correo y los títulos y horarios de citas ya revisados se envían a %@ con tus misiones. Las fuentes se conectan por separado.", store.settings.providerName)).font(.system(size: 10)).foregroundStyle(.secondary).lineSpacing(4)
             }
         }
     }
     private var connections: some View {
         VStack(spacing: 18) {
-            OpenAIConnectionView()
+            AIConnectionView()
             RemoteSettingsView(remote: store.remote)
             card("Calendarios de macOS", icon: "calendar") {
                 HStack { Text(L(store.calendarStatus)).font(.system(size: 11)); Spacer(); Button(L(store.state.preferences.watchCalendar ? "Revisar permiso" : "Conectar agenda"), action: store.connectCalendar); if store.state.preferences.watchCalendar { Button(L("Desconectar")) { store.state.preferences.watchCalendar = false; store.calendarStatus = "Sin conectar"; store.save() } } }
                 Text(L("Lee las próximas citas de las cuentas añadidas a Calendario, incluidas Apple, Google y Outlook. Las novedades aparecen en tu bandeja.")).font(.system(size: 11)).foregroundStyle(.secondary).lineSpacing(4)
             }
+            card("Apple Notas", icon: "note.text") {
+                HStack { Text(L(store.notesStatus)).font(.system(size: 11)).lineLimit(3); Spacer(); Button(L(store.state.preferences.watchNotes == true ? "Comprobar Notas" : "Conectar Apple Notas"), action: store.connectNotes); if store.state.preferences.watchNotes == true { Button(L("Desconectar")) { store.state.preferences.watchNotes = false; store.notesStatus = "Sin conectar"; store.save() } } }
+                Text(L("Aster busca y lee tus notas cuando se lo pides y crea notas nuevas (por ejemplo, actas, resúmenes o ideas). No modifica ni borra las existentes.")).font(.system(size: 11)).foregroundStyle(.secondary).lineSpacing(4)
+            }
             card("Apple Mail", icon: "envelope") {
                 HStack { Text(L(store.mailStatus)).font(.system(size: 11)).lineLimit(3); Spacer(); Button(L(store.state.preferences.watchMail ? "Comprobar Mail" : "Conectar Apple Mail"), action: store.connectMail); if store.state.preferences.watchMail { Button(L("Desconectar")) { store.state.preferences.watchMail = false; store.mailStatus = "Sin conectar"; store.save() } } }
-                Text(L("Pídele el último correo, una búsqueda o un resumen: Aster abre el mensaje real y lee su contenido. Funciona con las cuentas añadidas a Mail, incluidas Gmail y Outlook.")).font(.system(size: 11)).foregroundStyle(.secondary).lineSpacing(4)
+                Text(L("Pídele el último correo, una búsqueda o un resumen: Aster abre el mensaje real y lee su contenido. También prepara borradores en Mail para que los revises y los envíes tú; Aster nunca envía correo. Funciona con las cuentas añadidas a Mail, incluidas Gmail y Outlook.")).font(.system(size: 11)).foregroundStyle(.secondary).lineSpacing(4)
             }
             card("Recordatorios de Apple", icon: "checklist") {
                 HStack { Text(L(store.remindersStatus)).font(.system(size: 11)).lineLimit(3); Spacer(); Button(L(store.state.preferences.watchReminders == true ? "Revisar permiso" : "Conectar Recordatorios"), action: store.connectReminders); if store.state.preferences.watchReminders == true { Button(L("Desconectar")) { store.state.preferences.watchReminders = false; store.reminders = []; store.remindersStatus = "Sin conectar"; store.save() } } }
@@ -103,11 +113,22 @@ struct SettingsView: View {
     }
     private var voices: some View {
         VStack(spacing: 18) {
+            card("Aster en tu Mac", icon: "macbook") {
+                Picker(L("Presentación"), selection: Binding(get: { store.state.preferences.desktopStyle ?? "island" }, set: { store.applyDesktopStyle?($0) })) {
+                    Text(L("Isla dinámica")).tag("island"); Text(L("Mascota flotante")).tag("floating")
+                }.pickerStyle(.segmented)
+                Text(L("La isla vive en el notch de tu MacBook (o arriba en el centro en otras pantallas): pasa el cursor por encima o pulsa ⌥Espacio para hablarle. Mientras Aster escucha, piensa o habla, se ensancha y muestra lo que hace.")).font(.system(size: 11)).foregroundStyle(.secondary).lineSpacing(4)
+            }
+            card("Hablar con Aster", icon: "mic") {
+                Toggle(L("⌥Espacio para hablar desde cualquier app"), isOn: Binding(get: { store.state.preferences.voiceShortcut != false }, set: { store.state.preferences.voiceShortcut = $0; store.save(); store.applyVoiceShortcut?($0) })).toggleStyle(.switch)
+                Toggle(L("Responder en voz alta cuando hablo"), isOn: Binding(get: { store.state.preferences.speakReplies != false }, set: { store.state.preferences.speakReplies = $0; store.save() })).toggleStyle(.switch)
+                Text(L("Pulsa el micrófono o ⌥Espacio, habla y haz una pausa: Aster envía lo que has dicho. Vuelve a pulsar para terminar antes. El reconocimiento se hace en este Mac cuando el idioma lo permite; si no, macOS usa el servicio de Apple. Escucha el idioma de las respuestas o, en automático, el de la interfaz.")).font(.system(size: 11)).foregroundStyle(.secondary).lineSpacing(4)
+            }
             card("Una voz para cada compañero", icon: "waveform") {
                 Picker(L("Tipo de voz"), selection: Binding(get: { store.state.preferences.voiceEngine ?? "natural" }, set: { store.voice.stop(); store.state.preferences.voiceEngine = $0; store.save() })) { Text(L("Natural · OpenAI")).tag("natural"); Text(L("Voces de macOS")).tag("system") }
-                Text(L("Las voces naturales son generadas por IA. Leen en el idioma del texto y usan tu saldo de OpenAI. Las voces de macOS funcionan sin esa conexión.")).font(.system(size: 11)).foregroundStyle(.secondary).lineSpacing(4)
+                Text(L(store.settings.usesClaude && !AIProvider.openai.hasKey ? "Las voces naturales son de OpenAI y necesitan su clave. Mientras uses solo Claude, Aster habla con las voces de macOS." : "Las voces naturales son generadas por IA. Leen en el idioma del texto y usan tu saldo de OpenAI. Las voces de macOS funcionan sin esa conexión.")).font(.system(size: 11)).foregroundStyle(.secondary).lineSpacing(4)
                 ForEach(store.state.specialists) { agent in
-                    HStack { Circle().fill(agent.style.tint.color).frame(width: 7, height: 7); Text(agent.name).font(.system(size: 12, weight: .medium)).frame(width: 65, alignment: .leading); Picker(L("Voz"), selection: Binding(get: { store.state.preferences.agentVoices?[agent.id] ?? AsterVoice.defaultID(agent.id) }, set: { store.state.preferences.agentVoices = (store.state.preferences.agentVoices ?? [:]).merging([agent.id: $0]) { _, new in new }; store.save() })) { ForEach(AsterVoice.all) { Text(L($0.label)).tag($0.id) } }.labelsHidden().disabled(store.state.preferences.voiceEngine == "system"); Button(L("Escuchar")) { store.select(agent.id); store.speak(L("Hola. Estoy aquí para pensar contigo, ayudarte a crear y acompañarte en lo que necesites.")) } }.font(.system(size: 11))
+                    HStack { Image(systemName: agent.symbol).font(.system(size: 10)).foregroundStyle(Color.asterAccent).frame(width: 14); Text(agent.mode).font(.asterMono(11, weight: .medium)).frame(width: 65, alignment: .leading); Picker(L("Voz"), selection: Binding(get: { store.state.preferences.agentVoices?[agent.id] ?? AsterVoice.defaultID(agent.id) }, set: { store.state.preferences.agentVoices = (store.state.preferences.agentVoices ?? [:]).merging([agent.id: $0]) { _, new in new }; store.save() })) { ForEach(AsterVoice.all) { Text(L($0.label)).tag($0.id) } }.labelsHidden().disabled(store.state.preferences.voiceEngine == "system"); Button(L("Escuchar")) { store.select(agent.id); store.speak(L("Hola. Estoy aquí para pensar contigo, ayudarte a crear y acompañarte en lo que necesites.")) } }.font(.system(size: 11))
                 }
                 if store.speaking { Button(L("Detener voz")) { store.voice.stop() } }
             }
@@ -121,7 +142,7 @@ struct SettingsView: View {
         VStack(spacing: 18) {
             card("Trabajo autónomo", icon: "moon.stars") {
                 Toggle(L("Preparar trabajo sin esperar mi mensaje"), isOn: preference(\.autonomous)).toggleStyle(.switch).disabled(store.companies.isEmpty)
-                Text(L("Aster revisa el objetivo y las tareas de la empresa, prepara una propuesta y te escribe cuando termina. Cada misión usa tu saldo de OpenAI.")).font(.system(size: 11)).foregroundStyle(.secondary).lineSpacing(4)
+                Text(LF("Aster revisa el objetivo y las tareas de la empresa, prepara una propuesta y te escribe cuando termina. Cada misión usa tu saldo de %@.", store.settings.providerName)).font(.system(size: 11)).foregroundStyle(.secondary).lineSpacing(4)
                 Picker(L("Empresa"), selection: preference(\.autonomousCompanyID)) {
                     Text(L("Rotar entre mis empresas")).tag(nil as UUID?)
                     ForEach(store.companies) { Text($0.name).tag(Optional($0.id)) }
@@ -143,7 +164,7 @@ struct SettingsView: View {
             }
             card("Siempre cerca", icon: "macwindow.on.rectangle") {
                 Text(L("Cerrar la ventana mantiene Aster en la barra de menús. Las revisiones de correo y agenda se realizan cada 15 minutos con el Mac despierto y Aster abierto.")).font(.system(size: 12)).foregroundStyle(.secondary).lineSpacing(5)
-                Text(L("Los agentes ya iniciados trabajan en OpenAI. Las herramientas locales esperan a que Aster vuelva a estar abierto. Programar trabajo nuevo o revisar cuentas con el Mac apagado requiere un servicio en la nube que todavía no está conectado.")).font(.system(size: 11)).foregroundStyle(.secondary).lineSpacing(4)
+                Text(L(store.settings.usesClaude ? "Con Claude, las misiones se ejecutan desde este Mac y necesitan Aster abierto. Programar trabajo o revisar cuentas con el Mac apagado requiere un servicio en la nube que todavía no está conectado." : "Los agentes ya iniciados trabajan en OpenAI. Las herramientas locales esperan a que Aster vuelva a estar abierto. Programar trabajo nuevo o revisar cuentas con el Mac apagado requiere un servicio en la nube que todavía no está conectado.")).font(.system(size: 11)).foregroundStyle(.secondary).lineSpacing(4)
             }
         }
     }

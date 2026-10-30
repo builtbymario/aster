@@ -1,8 +1,12 @@
 import Foundation
+import XCTest
+@testable import Aster
 
-@main struct WorkspaceTests {
-    static func check(_ condition: @autoclosure () -> Bool, _ message: String) { if !condition() { fatalError(message) } }
-    @MainActor static func main() throws {
+final class WorkspaceTests: XCTestCase {
+    /// Legacy migration, restart recovery, durable tool receipts, local tasks, memory permissions, source sharing, configuration changes, reversible archiving, duplicate input protection, quiet hours, daily limits and Markdown streaming.
+    @MainActor func testWorkspaceStateToolsAndAutonomy() throws { try Self.run() }
+    static func check(_ condition: @autoclosure () -> Bool, _ message: String = "", file: StaticString = #filePath, line: UInt = #line) { XCTAssertTrue(condition(), message, file: file, line: line) }
+    @MainActor static func run() throws {
         let temp = FileManager.default.temporaryDirectory.appendingPathComponent("aster-tests-" + UUID().uuidString)
         try FileManager.default.createDirectory(at: temp, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: temp) }
@@ -28,9 +32,11 @@ import Foundation
         let persisted = try reloaded.performTool("session-local", call: call, missionID: mid)
         check(persisted == result, "Tool receipt must survive app restart")
         check(reloaded.state.tasks.count == 1, "Restart preserves the same local task")
-        let sources = try store.performTool("session-local", call: .init(turnID: "turn-local", callID: "call-sources", name: "aster_workspace", arguments: ["query": "sources"]), missionID: mid)
+        // Reading source summaries exposes a conversation to outside content, so it uses its own.
+        let reader = Mission(title: "Reader", specialistID: "director"); store.state.missions.append(reader)
+        let sources = try store.performTool("session-local", call: .init(turnID: "turn-local", callID: "call-sources", name: "aster_workspace", arguments: ["query": "sources"]), missionID: reader.id)
         check(sources.contains("false") && sources.contains("[]"), "Private sources must not be returned without opt-in")
-        do { _ = try store.performTool("session-local", call: .init(turnID: "turn-local", callID: "call-memory", name: "aster_remember", arguments: ["text": "Una preferencia"]), missionID: mid); fatalError("Memory mutation must require opt-in") } catch {}
+        do { _ = try store.performTool("session-local", call: .init(turnID: "turn-local", callID: "call-memory", name: "aster_remember", arguments: ["text": "Una preferencia"]), missionID: mid); XCTFail("Memory mutation must require opt-in") } catch {}
         var settings = store.settings; settings.automaticMemory = true; store.settings = settings
         _ = try store.performTool("session-local", call: .init(turnID: "turn-local", callID: "call-memory-enabled", name: "aster_remember", arguments: ["text": "Prefiero propuestas breves"]), missionID: mid)
         check(store.state.memories.count == 1, "Enabled memory tool persists a requested preference")
@@ -57,6 +63,5 @@ import Foundation
         check(blocks.count == 4 && blocks[2].text == "let x = 1", "Markdown code and headings retain exact content")
         let unfinished = MessageBlock.parse("```js\nconst x = 1;")
         check(unfinished.count == 1 && unfinished[0].text == "const x = 1;", "Partial streamed code remains readable")
-        print("PASS: legacy migration, restart recovery, durable tool receipts, local tasks, memory permissions, source sharing, configuration changes, reversible archiving, duplicate input protection, quiet hours, daily limits and Markdown streaming.")
     }
 }

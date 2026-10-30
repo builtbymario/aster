@@ -9,7 +9,7 @@ struct ActivityWorkspaceView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 HStack {
-                    VStack(alignment: .leading, spacing: 6) { Text(L("Tu equipo en marcha.")).font(.system(size: 29, weight: .semibold, design: .rounded)); Text(L("Cada agente conserva su conversación y su trabajo.")).font(.system(size: 12)).foregroundStyle(.secondary) }
+                    VStack(alignment: .leading, spacing: 6) { Text(L("Tu equipo en marcha.")).font(.system(size: 29, weight: .semibold)); Text(L("Cada agente conserva su conversación y su trabajo.")).font(.system(size: 12)).foregroundStyle(.secondary) }
                     Spacer()
                     Picker(L("Trabajos simultáneos"), selection: Binding(get: { store.parallelLimit }, set: { store.state.preferences.parallelMissions = $0; store.save() })) { ForEach(1...6, id: \.self) { Text("\($0)").tag($0) } }.frame(width: 200)
                 }
@@ -55,7 +55,7 @@ struct ActivityWorkspaceView: View {
             }.padding(22)
         }.scrollIndicators(.hidden).sheet(item: $editing) { routine in RoutineEditor(routine: routine) }
     }
-    private func agentName(_ id: String) -> String { store.state.specialists.first { $0.id == id }?.name ?? "Aster" }
+    private func agentName(_ id: String) -> String { store.state.specialists.first { $0.id == id }?.title ?? "Aster" }
     private func template(_ title: String, agent: String, prompt: String) -> some View {
         Button { var value = AgentRoutine(); value.title = L(title); value.instruction = L(prompt); value.specialistID = agent; editing = value } label: { VStack(alignment: .leading, spacing: 9) { Image(systemName: "sparkle"); Text(L(title)).font(.system(size: 12, weight: .medium)); Text(L("Personalizar")).font(.system(size: 10)).foregroundStyle(.secondary) }.frame(maxWidth: .infinity, alignment: .leading).padding(19).frostedSurface(19) }.buttonStyle(.plain)
     }

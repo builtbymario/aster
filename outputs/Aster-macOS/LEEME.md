@@ -2,6 +2,45 @@
 
 Esta vista previa es nativa para **Apple Silicon e Intel, con macOS 14 o posterior**. Conserva tus personajes, conversaciones, empresas, memoria y preferencias de versiones anteriores. La app está firmada localmente y todavía no está notarizada para distribuirla a otros usuarios. Consulta **INSTALAR.md** antes de trasladarla a otro Mac; Intel se ha compilado, pero no probado en hardware real.
 
+## En desarrollo: tu IA, OpenAI o Claude
+
+Aster no incluye ninguna clave. Al abrirlo por primera vez, una **bienvenida** de cuatro pasos te presenta a Aster, te pide elegir con qué IA piensa (**Claude**, de Anthropic, u **OpenAI**), comprueba tu clave y te deja elegir el modelo entre los que tu cuenta puede usar; después te pregunta cómo llamarte, el idioma y si quieres Aster en el notch o como mascota flotante, y termina con los atajos y la conexión opcional de Calendario, Notas, Mail y notificaciones. La clave queda en el Llavero de tu Mac y solo se envía a quien la emitió. Puedes cambiar de IA o de modelo cuando quieras en **Ajustes → Conexiones**.
+
+Con Claude funcionan el chat, las herramientas, la búsqueda web, el control del Mac y las preguntas sobre tu pantalla. Las misiones se ejecutan desde este Mac y escriben el entregable completo en la respuesta, porque Claude no tiene aquí un espacio de agentes con archivos; con OpenAI, las misiones siguen usando ese espacio en la nube. Las voces naturales son de OpenAI: si solo usas Claude, Aster habla con las voces de macOS.
+
+## En desarrollo: Aster actúa por ti
+
+Desde la isla, Aster ya no solo responde: **hace cosas**. Pídeselo con texto o con la voz:
+
+- **Manejar tu Mac:** «abre Numbers y hazme una tabla de gastos de este mes». Aster ejecuta la tarea con el control del Mac, enseña cada paso, se detiene para pedirte permiso antes de enviar, comprar o borrar y te cuenta el resultado real, incluido lo que no le dejaste hacer. Si detienes el chat, se detiene también en el Mac.
+- **Tu pantalla:** pulsa el ojo del campo de escritura y la siguiente pregunta irá con una captura de la pantalla (sin las ventanas de Aster). Útil para un error de código, un ejercicio o una web. La captura solo acompaña a esa pregunta.
+- **Calendario, correo y notas:** crea eventos (sin invitar a nadie), prepara borradores en Mail para que los revises y los envíes tú (Aster nunca envía correo) y busca, lee y crea notas en Apple Notas (conéctalo en Ajustes → Conexiones).
+- **Misiones:** para entregables, investigación o código, Aster lanza una misión en segundo plano en el modo adecuado; el resultado llega a Misiones y Bandeja.
+- **Lanzar una startup:** «quiero montar una startup de apuntes para estudiantes». Aster crea la empresa y arranca a todos los departamentos en paralelo: estrategia, mercado con fuentes, producto e ingeniería, growth, finanzas con modelo en CSV y legal y operaciones, más las tareas de los próximos siete días. También desde Empresas con **Lanzar startup**. Nada se publica, se contrata, se paga ni se envía.
+- **Modo Auto:** el chat general elige solo el modo adecuado para cada petición y cambia cuando la conversación cambia; la cabecera muestra, por ejemplo, «AUTO · BUILDER». Los chips siguen permitiendo fijar un modo.
+- **Proactivo en todo:** cada respuesta termina con hasta tres siguientes pasos como botones (después de explicar, ejercicios; después de código, tests; después de una web, investigar la idea…). Pulsa uno o responde «sí» y Aster lo hace. Cuando termina una misión que lanzó desde el chat, Aster vuelve solo al chat, te dice qué está listo y propone lo siguiente.
+- **Nueve modos:** Auto, Study, Builder, Founder, Research, Finance, Growth, Content y Personal.
+
+## En desarrollo: seguridad de acciones
+
+Cuando Aster maneja tu Mac, cada clic, tecla o texto se revisa en el código antes de ejecutarse; no depende de que la IA se porte bien. Aster lee con Accesibilidad el control real que hay bajo el cursor y la app activa:
+
+- **Necesita tu permiso:** pulsar botones como Enviar, Responder a todos, Comprar, Pagar, Publicar, Eliminar, Mover a la papelera, Firmar, Aceptar o Permitir; Intro en apps de mensajería (Mensajes, Slack, WhatsApp, Telegram, Teams…); ⌘⇧D en Mail; ⌘Intro en navegadores; ⌘Q, ⌘⌫ y forzar salida; y cualquier paso que la propia IA marque como delicado o describa como enviar, pagar o comprar. La tarea se pausa y Ordenador muestra **Permitir este paso** o **No permitir**. Antes de ejecutar un paso aprobado, Aster comprueba que el control bajo el cursor sigue siendo el mismo.
+- **Bloqueado siempre:** escribir contraseñas (campos seguros), números de tarjeta, claves de API o claves privadas; abrir Terminal, Editor de Scripts, Automator, Acceso a Llaveros, Contraseñas o Ajustes del Sistema; cerrar sesión o bloquear el Mac.
+- **Contenido externo:** si una conversación ha leído correo, notas, calendarios, recordatorios, la web o tu pantalla, ese contenido podría intentar darle órdenes a Aster. En esas conversaciones, manejar el Mac o lanzar una misión pide tu confirmación mostrando la acción exacta, y no se guardan recuerdos. En los navegadores, pulsar Intro en un formulario o en la barra de direcciones también pide permiso.
+- **Enlaces:** los enlaces de las respuestas solo abren direcciones web y de correo; nunca Atajos, archivos ni otras apps.
+- **Tareas iniciadas desde el iPhone:** como nadie está delante del Mac para confirmar, los pasos que necesitan permiso se deniegan y la IA continúa sin ellos. Continuar desde el iPhone no aprueba nada.
+
+## En desarrollo: Aster en el notch
+
+Aster vive ahora en el **notch** del MacBook, como una isla dinámica. En reposo se funde con el notch y no ocupa nada. Pasa el cursor por el notch o pulsa **⌥Espacio** para abrirla: se despliega como una sola barra (Aster, su modo, el campo, la pantalla, la voz y enviar) y crece con un muelle solo lo que necesita la última respuesta y sus siguientes pasos. El modo se cambia tocando su etiqueta; la conversación completa se abre en la ventana principal. Mientras Aster escucha, piensa o habla, la isla se ensancha y muestra a la mascota a la izquierda y lo que hace a la derecha (ondas, puntos o una marca al terminar); mientras te escucha brilla en lavanda. Se cierra al hacer clic fuera, con Esc o con la ✕, y no se vuelve a abrir hasta que el cursor sale del notch. En pantallas sin notch aparece arriba en el centro. La isla sustituye a la mascota flotante y al compañero que seguía el cursor; la mascota flotante sigue disponible en **Ajustes → Voces → Aster en tu Mac**.
+
+## En desarrollo: un Aster con modos
+
+Aster es ahora **un único compañero** con modos (hoy nueve, con Auto, que elige solo). Cada modo conserva su propia conversación, voz y personalidad; la IA se presenta siempre como Aster en el modo elegido. En el escritorio hay un solo Aster: en la isla del notch o, si lo prefieres, como mascota flotante; el modo se cambia desde su etiqueta. Las conversaciones y ajustes anteriores se conservan; los nombres de los antiguos personajes ya no se muestran.
+
+La mascota es un personaje blanco con ojos oscuros y un anillo lavanda flotando debajo. El anillo muestra lo que hace: quieto en calma, con ondas mientras escucha, discontinuo y girando mientras piensa, y convertido en ondas de sonido mientras habla. La interfaz usa neutros sobrios, líneas finas, un único acento lavanda y etiquetas monoespaciadas, en modo claro y oscuro. El icono de la app y el de la barra de menús muestran la nueva mascota.
+
 ## Novedades de 0.6
 
 La conexión de OpenAI se configura desde Ajustes → Conexiones y se guarda en el Llavero. Ya no depende de una ruta privada de este ordenador. Restaurar copia permite trasladar tu espacio desde otro Mac, con copia previa del estado actual y las rutinas importadas pausadas.
@@ -50,7 +89,7 @@ Pasa el cursor por un compañero durante un instante para abrir su minichat comp
 
 **Ventana → Chat rápido** abre el chat del compañero seleccionado. **Hablar con…** permite elegir cualquiera de los seis. Con Aster activa, **⌥⌘J** abre el minichat y **⌥⌘B** pliega o despliega el equipo. Estas acciones también están disponibles en la barra de menús.
 
-El minichat usa el mismo motor, memoria, personalidad, voces y herramientas conectadas de Aster. Mail, Calendarios y Recordatorios siguen necesitando sus conexiones. Para tareas de control del Mac, abre Ordenador: el minichat no afirma haber movido el cursor desde una sesión alojada.
+El minichat es el **chat rápido** de Aster: responde al momento, en directo, sin abrir una sesión alojada para cada pregunta. La conversación se guarda en tu Mac y se envía con cada mensaje; usa la misma memoria, personalidad, voces y herramientas conectadas (Mail, Calendarios, Recordatorios, avisos, Salud importada y búsqueda en internet). Su modelo se elige en Ajustes → Inteligencia → Modelo del chat rápido. No crea archivos ni ejecuta código: para eso, empieza una misión en la ventana principal. Detener corta la respuesta al instante y conserva lo ya escrito; si cierras Aster durante una respuesta, basta con volver a enviar el mensaje. Para tareas de control del Mac, abre Ordenador: el minichat no afirma haber movido el cursor.
 
 ## Escritorio e icono en 0.4.2
 
@@ -96,7 +135,7 @@ La primera transición desde la firma antigua puede requerir esta renovación. L
 - **Ordenador**: pantalla en directo, movimientos de cursor, clics, escritura, atajos, desplazamiento y apertura de apps, con explicación visible de cada paso.
 - **Voces**: trece voces naturales de OpenAI, elección por personaje y voces de macOS. La voz detecta el idioma del texto; las respuestas pueden seguir el idioma de tu mensaje.
 - Tareas separadas en **Aster**, **Apple** y **Avisos**.
-- Interfaz en español, inglés y catalán. La conversación puede usar otros idiomas.
+- Interfaz en español e inglés. La conversación puede usar otros idiomas.
 
 En macOS 26 o posterior los controles usan Liquid Glass nativo. En sistemas anteriores usan los materiales compatibles del sistema. Reducir movimiento y Reducir transparencia se respetan automáticamente.
 
@@ -151,9 +190,15 @@ Durante esa tarea, las capturas y etiquetas de controles se envían a OpenAI par
 
 **Esc detiene el control.** Si usas tú el teclado, haces clic o desplazas la pantalla, Aster pausa la tarea. Puedes responder a una pregunta, hacer tú un paso pendiente y continuar. También puedes detenerlo desde el panel o la página Ordenador. El historial de pasos y el resultado se conservan en Tus últimas tareas en el Mac y en la bandeja.
 
-Las acciones se ejecutan de una en una y el resultado se revisa en la captura siguiente. Hay un límite de 60 pasos por tarea y el tiempo máximo configurado en Inteligencia. La app rechaza coordenadas fuera de pantalla y combinaciones de teclas no admitidas. Un acceso, permiso, pago, envío, contrato o borrado irreversible se deja para intervención del usuario. El motor no tiene una herramienta de terminal.
+Las acciones se ejecutan de una en una y el resultado se revisa en la captura siguiente. Hay un límite de 60 pasos por tarea y el tiempo máximo configurado en Inteligencia. La app rechaza coordenadas fuera de pantalla y combinaciones de teclas no admitidas. Aster revisa cada acción en el propio código antes de ejecutarla (ver «Seguridad de acciones»). El motor no tiene una herramienta de terminal.
 
 Una app o documento complejo puede necesitar más de una tarea. Comprueba el resultado antes de darlo por válido o entregarlo; una tarea completada por la IA no garantiza que cualquier interfaz o hoja de cálculo se haya entendido correctamente.
+
+## Hablar con Aster
+
+Pulsa el micrófono del minichat o **⌥Espacio** desde cualquier app: se abre el chat, tus palabras aparecen mientras hablas y, tras una pausa, Aster las envía. Vuelve a pulsar para terminar antes. Si has hablado, la respuesta se lee en voz alta con la voz del compañero; si empiezas a hablar mientras Aster habla, se calla para escucharte. Lo que ya hubieras escrito en el borrador se conserva delante de lo que dictas.
+
+La primera vez macOS pide permiso para el micrófono y el reconocimiento de voz. El reconocimiento se hace en este Mac cuando el idioma lo permite; si no, macOS usa el servicio de Apple. Aster escucha el idioma de las respuestas o, en automático, el de la interfaz. En **Ajustes → Voces → Hablar con Aster** puedes desactivar ⌥Espacio (por ejemplo, si lo usas para escribir espacios irrompibles) o la respuesta hablada. El micrófono solo está activo mientras dictas.
 
 ## Voces
 
@@ -193,7 +238,7 @@ Los datos se guardan de forma atómica en `~/Library/Application Support/Aster/s
 - La prueba real corrigió una configuración inválida que impedía iniciar conversaciones con los especialistas individuales. La suite de API comprueba ahora los seis personajes y el coordinador con delegación desactivada. También se conserva el foco del chat fijado al volver a activar Aster y se evitan guardados de borradores vacíos sin cambios.
 - Compilación nativa optimizada y firma local correctas. En 0.4.2 se revisó el logo real en Acerca de Aster, las opciones de ordenar, ocultar y recuperar el equipo, y las seis posiciones de 94 × 96 puntos conservadas al reabrir la app. Ordenador siguió reconociendo sus permisos tras la actualización. La herramienta de comprobación no pudo completar de forma fiable un arrastre real sobre las ventanas flotantes; esa interacción no está certificada por las pruebas automatizadas.
 - Siete suites: disposición del escritorio, protocolo de eventos, continuidad y datos, API y recuperación, control visual y cancelación, conexiones/avisos/Salud, y minichat. La prueba de disposición comprueba seis compañeros sin solaparse, pantallas pequeñas, coordenadas negativas de monitores, conservación de posiciones manuales y recuperación al desconectar un monitor. También cubre el espacio de la flecha y la colocación del minichat sin cubrir el compañero. La prueba de minichat verifica la separación de agentes, borradores e historial, la persistencia, el aislamiento de la ventana grande y sus adjuntos, la recuperación y los errores de conexión sin usar la red.
-- Misión real de OpenAI completada con dos especialistas, respuesta en catalán, archivo adjunto leído y comprobado, tarea local guardada y archivo de salida descargado y verificado. Sesión de prueba eliminada.
+- Misión real de OpenAI completada con dos especialistas, respuesta en otro idioma, archivo adjunto leído y comprobado, tarea local guardada y archivo de salida descargado y verificado. Sesión de prueba eliminada.
 - Voz natural Marin generada y MP3 decodificado correctamente: muestra de 11,16 segundos incluida junto a la app.
 - Modelo real `gpt-6-luna` identificó el botón correcto de una imagen de prueba usando el mismo esquema de acciones del control del Mac.
 - Revisión visual de la interfaz nueva y de la página Ordenador. Después de renovar las entradas antiguas, la app reconoció Pantalla y Accesibilidad y abrió la vista en directo. Atlas completó una tarea real de TextEdit, reemplazó dos líneas, guardó el mismo archivo y comprobó la pantalla. La inspección independiente del archivo guardado confirmó el contenido exacto. Después de una actualización, ambos permisos permanecieron concedidos.
@@ -209,6 +254,6 @@ Se verificó que dos variantes con hashes distintos y la misma firma local satis
 
 ## Construcción
 
-Con Xcode instalado, cierra Aster y ejecuta `zsh build.sh` en esta carpeta para generar Aster.app. `sign-local.py` conserva una identidad de desarrollo en `.aster-signing`, dos carpetas por encima del código. No borres esa carpeta si quieres que macOS reconozca futuras compilaciones. Su llavero privado queda bloqueado al terminar; la carpeta no se incluye en el paquete ni en el código distribuido. No se instala una raíz de confianza en el sistema. En otro Mac o en una carpeta nueva se creará otra identidad local y hará falta autorizarla. Para comprobar la lógica y el protocolo, ejecuta `zsh test.sh`. Las pruebas usan fuentes y respuestas aisladas; no necesitan tu clave ni mueven el cursor real.
+Esta carpeta es un paquete Swift (`Package.swift`) y necesita Xcode 26 o posterior. Ábrelo en Xcode para editar y ejecutar las pruebas. Para desarrollar, `zsh run.sh` hace una compilación incremental de depuración, la empaqueta, la firma y abre Aster (cerrando antes la copia de desarrollo si está abierta). Para la versión optimizada, cierra Aster y ejecuta `zsh build.sh` en esta carpeta para generar Aster.app; `ASTER_ARCHS="arm64 x86_64"` produce la versión universal. No abras la app con el botón Run de Xcode: solo el paquete que monta `build.sh` tiene Info.plist, recursos y la firma estable que necesitan los permisos de macOS. Para depurar, usa Debug → Attach to Process → Aster. `sign-local.py` conserva una identidad de desarrollo en `.aster-signing`, dos carpetas por encima del código. No borres esa carpeta si quieres que macOS reconozca futuras compilaciones. Su llavero privado queda bloqueado al terminar; la carpeta no se incluye en el paquete ni en el código distribuido. No se instala una raíz de confianza en el sistema. En otro Mac o en una carpeta nueva se creará otra identidad local y hará falta autorizarla. Para comprobar la lógica y el protocolo, ejecuta `zsh test.sh` (pruebas XCTest; admite argumentos de `swift test`, por ejemplo `--filter ComputerTests`). Las pruebas usan fuentes y respuestas aisladas; no necesitan tu clave ni mueven el cursor real. La prueba del relay se omite salvo que esté arrancado; `zsh test-remote.sh` la exige.
 
 Atajos: **⌘,** abre Ajustes; **⌘N** crea una misión nueva; **⌘L** enfoca el mensaje; **⌘W** cierra la ventana; **⌘M** la minimiza. Cada compañero del escritorio se puede arrastrar; doble clic abre la app con ese personaje y clic derecho permite ordenar la columna u ocultarlo.

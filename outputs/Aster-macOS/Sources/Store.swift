@@ -3,6 +3,7 @@ import SwiftUI
 import EventKit
 import UserNotifications
 import AVFoundation
+import Combine
 
 @MainActor final class AsterStore: ObservableObject {
     @Published var state = SavedState()
@@ -17,6 +18,13 @@ import AVFoundation
     var hasCapacity: Bool { activities.count < parallelLimit }
     func isRunning(_ id: UUID?) -> Bool { id.map { activities[$0] != nil } ?? false }
     func isAgentWorking(_ id: String) -> Bool { state.missions.contains { $0.specialistID == id && isRunning($0.id) } }
+    /// Aster's face on a surface: listening, speaking, thinking for that mode (or any work), or calm.
+    func mood(for agentID: String? = nil) -> AvatarMood {
+        if listener.phase == .listening { return .listening }
+        if speaking { return .speaking }
+        if agentID.map(isAgentWorking) ?? busy { return .thinking }
+        return .calm
+    }
     func activity(for id: UUID?) -> String { id.flatMap { activities[$0] } ?? "" }
     func setActivity(_ text: String, for id: UUID) { if runtimes[id] != nil { activities[id] = text } }
     private final class Runtime {
@@ -33,6 +41,8 @@ import AVFoundation
     @Published var calendarStatus = "Sin conectar"
     @Published var mailStatus = "Sin conectar"
     @Published var connectionStatus = "Sin comprobar"
+    /// The first-run welcome covers the window until it is finished.
+    @Published var onboarding = false
     @Published var connectionReady = false
     @Published var availableModels: [String] = []
     @Published var checkingConnection = false
@@ -41,18 +51,59 @@ import AVFoundation
     @Published var attachments: [Attachment] = []
     @Published var speaking = false
     @Published var remindersStatus = "Sin conectar"
+    @Published var notesStatus = "Sin conectar"
     @Published var reminders: [ReminderItem] = []
     private var timer: Timer?
     private var scanning = false
     var calendar = EKEventStore()
     let voice = VoicePlayer()
+    let listener: VoiceInput
+    /// Quick chats whose question was spoken, so their answer is read aloud.
+    private var spokenTurns = Set<UUID>()
+    private var listenerChanges: AnyCancellable?
+    /// Reads a spoken question's answer aloud; replaceable so tests never play audio.
+    lazy var replySpeaker: (String, String) -> Void = { [weak self] text, agentID in self?.say(text, agentID: agentID) }
+    /// Takes the screenshot for a question about the screen; replaceable so tests never capture the screen.
+    lazy var screenCapture: () async throws -> Data = { try await ScreenSnapshot.capture() }
+    /// The quick chat whose request is operating the Mac, so stopping it stops the Mac too.
+    var computerOwner: UUID?
+    /// Opens a Mail draft; replaceable so tests never open Mail.
+    /// Conversations that have read content Aster does not control: mail, notes, calendars, reminders,
+    /// the web or the screen. Text there could try to give Aster orders, so acting needs the user's yes.
+    var exposedConversations = Set<UUID>()
+    /// Asks the user to allow an action; replaceable so tests never show a dialog.
+    lazy var approver: (String, String) async -> Bool = { title, detail in
+        NSApp.activate(ignoringOtherApps: true)
+        let alert = NSAlert(); alert.messageText = title; alert.informativeText = detail; alert.alertStyle = .warning
+        alert.addButton(withTitle: L("Permitir")); alert.addButton(withTitle: L("No permitir"))
+        return alert.runModal() == .alertFirstButtonReturn
+    }
+    /// In a conversation that read outside content, an action runs only after the user allows it.
+    func approveIfExposed(_ conversation: UUID, action: String, detail: String) async throws {
+        guard exposedConversations.contains(conversation) else { return }
+        let message = LF("Aster quiere %@:", action) + "\n\n" + String(detail.prefix(800)) + "\n\n" + L("Esta conversación ha leído contenido externo (correo, notas, webs o tu pantalla) que podría intentar darle órdenes. Permítelo solo si se lo has pedido tú.")
+        guard await approver(L("¿Se lo has pedido tú?"), message) else {
+            throw AsterError.message("The user did not allow this action. The conversation read outside content, so Aster asks before acting; do not retry it unless the user asks again.")
+        }
+    }
+    lazy var mailDrafter: ([String], [String], String, String) async throws -> Void = { try await MailDrafts.open(to: $0, cc: $1, subject: $2, body: $3) }
+    /// Runs a task on the Mac for the quick chat; replaceable so tests never move the cursor.
+    lazy var computerRunner: (String, Specialist, IntelligenceSettings) async -> ComputerRun? = { [weak self] task, mode, settings in await self?.computer.perform(task, agent: mode, settings: settings) }
     let computer = ComputerController()
     lazy var remote = MacRemoteBridge(store: self)
     private let apiFactory: () throws -> AgentAPI
     private func makeAPI() throws -> AgentAPI { try apiFactory() }
+    private let chatFactory: (() throws -> ChatProvider)?
+    /// The provider chosen in Settings; tests can supply their own.
+    private func makeChat(mission: Bool = false) throws -> ChatProvider {
+        if let chatFactory { return try chatFactory() }
+        return settings.usesClaude ? AnthropicChatProvider(api: try AnthropicAPI(), rounds: mission ? 16 : OpenAIChatProvider.maximumToolRounds) : OpenAIChatProvider(api: try makeAPI())
+    }
     private let file: URL
     private let writer = SnapshotWriter()
     var onFloatingChange: (() -> Void)?
+    var applyVoiceShortcut: ((Bool) -> Void)?
+    var applyDesktopStyle: ((String) -> Void)?
     var onOpenCoach: (() -> Void)?
     var agent: Specialist { state.specialists.first { $0.id == state.preferences.selectedAgent } ?? Specialist.defaults[0] }
     var mission: Mission? { state.missions.first { $0.id == selectedMission } }
@@ -63,12 +114,15 @@ import AVFoundation
     }
     var companies: [Company] { state.companies.filter { $0.archived != true } }
     var currentCompany: Company? { companies.first { $0.id == mission?.companyID } }
-    init(directory: URL? = nil, startServices: Bool = true, apiFactory: @escaping () throws -> AgentAPI = { try AgentAPI() }) {
-        self.apiFactory = apiFactory
+    init(directory: URL? = nil, startServices: Bool = true, apiFactory: @escaping () throws -> AgentAPI = { try AgentAPI() }, chatFactory: (() throws -> ChatProvider)? = nil,
+         listener: VoiceInput? = nil) {
+        self.apiFactory = apiFactory; self.listener = listener ?? VoiceInput()
+        self.chatFactory = chatFactory
         let directory = directory ?? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("Aster")
         file = directory.appendingPathComponent("state.json")
         do {
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            try? FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: directory.path)
             if FileManager.default.fileExists(atPath: file.path) {
                 do { state = try JSONDecoder().decode(SavedState.self, from: Data(contentsOf: file)) }
                 catch {
@@ -80,19 +134,34 @@ import AVFoundation
             }
         } catch { notice = "No se han podido cargar los datos anteriores: \(error.localizedDescription)" }
         for index in state.missions.indices where ["Trabajando", "Cancelación pendiente", "Preparada"].contains(state.missions[index].status) {
+            if state.missions[index].engine == "direct" {
+                // A quick chat has no remote session to recover; the partial answer stays visible.
+                state.missions[index].status = "Detenida"
+                state.missions[index].error = "Aster se cerró mientras respondía. Puedes volver a enviar el mensaje."
+                continue
+            }
             state.missions[index].status = "Por recuperar"
             state.missions[index].error = "La app se cerró durante la misión. Recupera la sesión para ver su estado actual."
         }
-        if !state.specialists.contains(where: { $0.id == "study" }) { state.specialists.append(Specialist.defaults.first { $0.id == "study" }!) }
+        // Catalan is no longer offered; answers follow the user's message instead.
+        if state.preferences.intelligence?.responseLanguage == "ca" { state.preferences.intelligence?.responseLanguage = "auto" }
+        // Modes added in later versions join existing workspaces.
+        for mode in Specialist.defaults where !state.specialists.contains(where: { $0.id == mode.id }) { state.specialists.append(mode) }
+        // The general mode became Auto; keep any custom personality but update its description.
+        if let index = state.specialists.firstIndex(where: { $0.id == "director" }), state.specialists[index].role == "Dirección" {
+            state.specialists[index].role = "Automático"; state.specialists[index].detail = Specialist.autoDetail
+        }
         if state.preferences.watchReminders == true { remindersStatus = EKEventStore.authorizationStatus(for: .reminder) == .fullAccess ? "Conectado" : "Permiso pendiente" }
         if state.preferences.watchCalendar { calendarStatus = EKEventStore.authorizationStatus(for: .event) == .fullAccess ? "Conectado" : "Permiso pendiente" }
         if state.preferences.watchMail { mailStatus = "Activado · pendiente de revisión" }
+        if state.preferences.watchNotes == true { notesStatus = "Conectado" }
         if startServices {
             timer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in Task { @MainActor in await self?.tick() } }
             refreshConnection()
         }
         voice.stateChanged = { [weak self] in self?.speaking = $0 }
         voice.failed = { [weak self] in self?.notice = $0 }
+        listenerChanges = self.listener.objectWillChange.sink { [weak self] _ in self?.objectWillChange.send() }
         computer.onNarration = { [weak self] text in
             guard let self, self.state.preferences.narrateComputer != false else { return }
             self.voice.narrate(text, language: VoiceText.language(text, fallback: UserDefaults.standard.string(forKey: "AsterLanguage") ?? "es"))
@@ -156,8 +225,12 @@ import AVFoundation
         guard !checkingConnection else { return }; checkingConnection = true
         Task {
             do {
-                availableModels = try await AgentAPI().availableModels()
-                connectionReady = availableModels.contains(settings.model)
+                let provider: AIProvider = settings.usesClaude ? .anthropic : .openai
+                guard let key = try CredentialVault.read(provider.keyAccount).flatMap({ String(data: $0, encoding: .utf8) }) else {
+                    throw AsterError.message(LF("Conecta %@ en Ajustes → Conexiones para empezar.", provider.name))
+                }
+                availableModels = try await provider.models(key: key)
+                connectionReady = availableModels.contains(settings.workModel)
                 connectionStatus = connectionReady ? "Clave válida · modelo disponible" : "El modelo elegido no está disponible en esta cuenta"
             } catch { connectionReady = false; connectionStatus = error.localizedDescription }
             checkingConnection = false
@@ -166,7 +239,7 @@ import AVFoundation
     func attachFiles() {
         guard !mainWorking else { return }
         let panel = NSOpenPanel(); panel.allowsMultipleSelection = true; panel.canChooseDirectories = false
-        panel.message = L("Los archivos que adjuntes se enviarán a OpenAI al iniciar la misión.")
+        panel.message = LF("Los archivos que adjuntes se enviarán a %@ al iniciar la misión.", settings.providerName)
         if panel.runModal() == .OK {
             for url in panel.urls {
                 do {
@@ -188,7 +261,7 @@ import AVFoundation
         return result
     }
     private func inputContext(text: String, company: Company?, attachments: [Attachment], agentID: String) -> String {
-        var context: [String: Any] = ["user_name": settings.userName, "response_language": settings.responseLanguage, "tone": settings.tone, "detail": settings.detail, "local_time": Date().formatted(.iso8601), "time_zone": TimeZone.current.identifier, "connected_sources": ["apple_mail": state.preferences.watchMail, "calendar": state.preferences.watchCalendar, "apple_reminders": state.preferences.watchReminders == true, "apple_health_import": state.health != nil], "team": state.specialists.map { ["name": $0.name, "role": $0.role, "personality": $0.personality ?? ""] }]
+        var context: [String: Any] = ["user_name": settings.userName, "response_language": settings.responseLanguage, "tone": settings.tone, "detail": settings.detail, "local_time": Date().formatted(.iso8601), "time_zone": TimeZone.current.identifier, "connected_sources": ["apple_mail": state.preferences.watchMail, "calendar": state.preferences.watchCalendar, "apple_reminders": state.preferences.watchReminders == true, "apple_notes": state.preferences.watchNotes == true, "apple_health_import": state.health != nil], "modes": state.specialists.map { ["mode": $0.mode, "role": $0.role] }]
         if let company { context["company"] = ["name": company.name, "goal": company.goal, "notes": company.notes] }
         if settings.useMemory {
             context["memory"] = memoryContext(companyID: company?.id)
@@ -217,12 +290,22 @@ import AVFoundation
         guard !isRunning(desktopMission(for: agentID)?.id) else { return }
         state.desktopChats.removeValue(forKey: agentID); save()
     }
-    @discardableResult func sendDesktop(_ text: String, agentID: String) -> Bool {
+    @discardableResult func sendDesktop(_ text: String, agentID: String, spoken: Bool = false, screen: Bool = false) -> Bool {
         guard state.specialists.contains(where: { $0.id == agentID }) else { return false }
-        return run(text, missionID: desktopMission(for: agentID)?.id, specialistID: agentID, desktop: true)
+        guard run(text, missionID: desktopMission(for: agentID)?.id, specialistID: agentID, desktop: true, screen: screen) else { return false }
+        if spoken, let id = desktopMission(for: agentID)?.id { spokenTurns.insert(id) }
+        return true
+    }
+    /// The language dictation listens for: the chosen answer language, or the interface language.
+    var dictationLanguage: String { settings.responseLanguage == "auto" ? (UserDefaults.standard.string(forKey: "AsterLanguage") ?? "es") : settings.responseLanguage }
+    /// Starts listening; anything Aster is saying stops so it doesn't talk over the user.
+    func startDictation(onUpdate: @escaping (String) -> Void, onFinish: @escaping (String) -> Void) {
+        voice.stop()
+        listener.onError = { [weak self] in self?.notice = $0 }
+        listener.start(language: dictationLanguage, onUpdate: onUpdate, onFinish: onFinish)
     }
     @discardableResult func run(_ text: String, companyID: UUID? = nil, fresh: Bool = false, proactive: Bool = false,
-                               missionID: UUID? = nil, specialistID: String? = nil, desktop: Bool = false, background: Bool = false) -> Bool {
+                               missionID: UUID? = nil, specialistID: String? = nil, desktop: Bool = false, background: Bool = false, screen: Bool = false) -> Bool {
         let text = text.trimmingCharacters(in: .whitespacesAndNewlines); guard !text.isEmpty, hasCapacity else { return false }
         let requestedAgent = state.specialists.first { $0.id == specialistID } ?? agent
         let intendedMission = desktop || background ? missionID : selectedMission
@@ -239,6 +322,14 @@ import AVFoundation
         let id = state.missions[index].id
         if desktop { state.desktopChats[requestedAgent.id] = id }
         let usedAgent = state.specialists.first { $0.id == state.missions[index].specialistID } ?? agent
+        if desktop { return runQuick(text, index: index, agent: usedAgent, screen: screen) }
+        if settings.usesClaude {
+            // Claude has no hosted agent workspace: the mission runs here, through the chat provider.
+            let attached = background ? [] : attachments
+            if !background { attachments = []; page = "Misiones"; artifacts = [] }
+            let company = state.companies.first { $0.id == (companyID ?? state.missions[index].companyID) }
+            return runQuick(text, index: index, agent: usedAgent, mission: .init(company: company, attachments: attached, proactive: proactive))
+        }
         let configuration = AgentAPI.signature(for: usedAgent, settings: settings)
         var sessionID = state.missions[index].sessionID
         var history = ""
@@ -273,6 +364,86 @@ import AVFoundation
         }
         return true
     }
+    /// Desktop companions answer through a ChatProvider: streamed, with Aster's local tools, and the transcript kept here.
+    /// Applies Aster's hidden notes to the latest answer: clean text, chosen mode and proposed next steps.
+    func applyMarkup(to id: UUID) {
+        guard let index = state.missions.firstIndex(where: { $0.id == id }), let last = state.missions[index].messages.lastIndex(where: { $0.role == "assistant" }) else { return }
+        let parsed = AsterMarkup.parse(state.missions[index].messages[last].text)
+        state.missions[index].messages[last].text = parsed.text
+        // The cleaned text is final; a later stream flush must not write the raw parts back.
+        runtimes[id]?.parts = [:]; runtimes[id]?.partOrder = []
+        if let mode = parsed.mode, state.specialists.contains(where: { $0.id == mode }) { state.missions[index].activeMode = mode }
+        state.missions[index].suggestions = parsed.next.isEmpty ? nil : parsed.next
+    }
+    /// When a mission started from a quick chat ends, Aster returns to that chat on its own with
+    /// what is ready, where to find it and what could come next.
+    func followUp(afterMission id: UUID) {
+        guard let mission = state.missions.first(where: { $0.id == id }), let parent = mission.parentChat,
+              let index = state.missions.firstIndex(where: { $0.id == parent }), state.missions[index].engine == "direct",
+              !isRunning(parent), hasCapacity, let mode = state.specialists.first(where: { $0.id == state.missions[index].specialistID }) else { return }
+        let result = String((mission.messages.last { $0.role == "assistant" }?.text ?? "").prefix(4000))
+        let files = (mission.artifactRecords ?? []).map { URL(fileURLWithPath: $0.path).lastPathComponent }
+        let outcome = mission.status == "Completada" ? "has finished" : "has stopped (status: \(mission.status); \(mission.error ?? ""))"
+        let event = "Aster event, not a message from the user: the mission «\(mission.title)» you started in \(mission.specialistID) mode \(outcome). Files: \(files.isEmpty ? "none" : files.joined(separator: ", ")).\nResult:\n\(result)\n\nTell the user in two or three sentences what is ready and where to find it (Missions in Aster), then propose the next steps."
+        _ = runQuick(event, index: index, agent: mode, hidden: true)
+    }
+    /// What a mission run through a chat provider carries beyond a quick message.
+    struct DirectMission { var company: Company?; var attachments: [Attachment]; var proactive: Bool }
+    private func runQuick(_ text: String, index: Int, agent: Specialist, screen: Bool = false, hidden: Bool = false, mission: DirectMission? = nil) -> Bool {
+        let id = state.missions[index].id
+        if let old = state.missions[index].sessionID {
+            state.missions[index].previousSessions = (state.missions[index].previousSessions ?? []) + [old]; state.missions[index].sessionID = nil
+        }
+        var history = QuickChat.history(state.missions[index].messages)
+        // The model sees what it proposed, so "sí" or a tapped step continues that thread.
+        if let steps = state.missions[index].suggestions, !steps.isEmpty, history.last?.role == "assistant" { history[history.count - 1].text += "\n[[next: " + steps.joined(separator: " | ") + "]]" }
+        state.missions[index].suggestions = nil
+        let attached = mission?.attachments ?? []
+        let request = ChatTurnRequest(model: mission == nil ? settings.chatModel : settings.workModel, effort: mission == nil ? QuickChat.effort : settings.effort,
+                                      instructions: QuickChat.instructions(for: agent, settings: settings, modes: state.specialists, mission: mission != nil),
+                                      history: history, input: inputContext(text: text, company: mission?.company, attachments: attached, agentID: agent.id),
+                                      tools: mission == nil ? QuickChat.tools(settings: settings) : AgentAPI.functionTools(settings: settings), webSearch: settings.webSearch, attachments: attached)
+        state.missions[index].engine = "direct"; state.missions[index].attachmentNames = (state.missions[index].attachmentNames ?? []) + attached.map(\.name)
+        if !hidden { state.missions[index].messages.append(.init(role: "user", text: text + (screen ? "\n\n🖥 " + L("Con tu pantalla") : "") + (attached.isEmpty ? "" : "\n\n" + attached.map { "📎 " + $0.name }.joined(separator: "\n")))) }
+        state.missions[index].messages.append(.init(role: "assistant", text: ""))
+        state.missions[index].status = "Trabajando"; state.missions[index].error = nil; state.missions[index].turnID = nil
+        state.missions[index].updated = Date(); state.missions[index].started = Date(); state.missions[index].elapsedSeconds = nil
+        startWork(id); setActivity(screen ? "Mirando tu pantalla" : "Pensando", for: id); save()
+        runtimes[id]?.task = Task { [weak self] in
+            guard let self else { return }
+            do {
+                var request = request
+                if screen { exposedConversations.insert(id) }
+                if screen { request.images = [try await screenCapture()]; setActivity("Pensando", for: id) }
+                let provider = try makeChat(mission: mission != nil)
+                _ = try await provider.respond(request, toolHandler: { [weak self] call in
+                    guard let self else { throw CancellationError() }
+                    return try await self.handleTool("direct-" + id.uuidString, call: call, missionID: id)
+                }, onEvent: { [weak self] event in
+                    switch event {
+                    case .text(let item, let delta): self?.handle(.text(item, delta, false), id: id)
+                    case .activity(let message): self?.setActivity(message, for: id)
+                    case .external: self?.exposedConversations.insert(id)
+                    }
+                })
+                flush(id); applyMarkup(to: id); setStatus(id, "Completada"); connectionStatus = "Conectado a " + settings.providerName; connectionReady = true
+                if let mission {
+                    followUp(afterMission: id)
+                    if mission.proactive, let item = state.missions.first(where: { $0.id == id }) { addNote(title: "El equipo ha preparado una propuesta", text: String((item.messages.last?.text ?? "Abre la misión para revisar el resultado.").prefix(450)), fingerprint: id.uuidString, missionID: id) }
+                }
+                if spokenTurns.remove(id) != nil, state.preferences.speakReplies != false, !listener.active, let item = state.missions.first(where: { $0.id == id }),
+                   let answer = item.messages.last(where: { $0.role == "assistant" })?.text, !answer.isEmpty {
+                    replySpeaker(answer, item.specialistID)
+                }
+            } catch {
+                if runtimes[id]?.cancelRequested == true { flush(id); setStatus(id, "Detenida") }
+                else { await failed(id, error: error, proactive: mission?.proactive ?? false) }
+            }
+            spokenTurns.remove(id)
+            finishWork(id)
+        }
+        return true
+    }
     func startWork(_ id: UUID) {
         guard runtimes[id] == nil else { return }
         let runtime = Runtime(); runtimes[id] = runtime; activities[id] = "Preparando la sesión"
@@ -302,7 +473,7 @@ import AVFoundation
             if runtime.streamFlushTask == nil { runtime.streamFlushTask = Task { [weak self, weak runtime] in
                 do { try await Task.sleep(for: .milliseconds(70)); self?.flush(id); runtime?.streamFlushTask = nil } catch {}
             } }
-        case .activity(let message): setActivity(message, for: id)
+        case .activity(let message): setActivity(message, for: id); if message == "Investigando fuentes" { exposedConversations.insert(id) }
         case .actions: setActivity("Consultando el espacio de trabajo", for: id)
         default: flush(id)
         }
@@ -321,7 +492,7 @@ import AVFoundation
             if !result.1.isEmpty, let i = state.missions.firstIndex(where: { $0.id == id }), let last = state.missions[i].messages.lastIndex(where: { $0.role == "assistant" }) { state.missions[i].messages[last].text = result.1; runtimes[id]?.parts = [:]; runtimes[id]?.partOrder = [] }
             if result.0 != "completed" { setStatus(id, "Por recuperar", error: result.2 ?? "Comprueba el estado de la sesión antes de continuar."); return }
         } catch { setStatus(id, "Por recuperar", error: "No se ha podido verificar el resultado: " + error.localizedDescription); return }
-        setStatus(id, "Completada"); connectionStatus = "Conectado a OpenAI"; connectionReady = true
+        applyMarkup(to: id); setStatus(id, "Completada"); connectionStatus = "Conectado a " + settings.providerName; connectionReady = true
         do {
             let files = try await api.artifacts(sid, turnID: item.turnID)
             if let i = state.missions.firstIndex(where: { $0.id == id }) {
@@ -329,6 +500,7 @@ import AVFoundation
                 if selectedMission == id { artifacts = state.missions[i].artifactRecords ?? [] }
             }
         } catch { notice = "La misión terminó, pero no se pudo cargar su lista de archivos: " + error.localizedDescription }
+        followUp(afterMission: id)
         if proactive, let item = state.missions.first(where: { $0.id == id }) { addNote(title: "El equipo ha preparado una propuesta", text: String((item.messages.last?.text ?? "Abre la misión para revisar el resultado.").prefix(450)), fingerprint: id.uuidString, missionID: id) }
     }
     private func failed(_ id: UUID, error: Error, proactive: Bool) async {
@@ -342,11 +514,13 @@ import AVFoundation
             }
         }
         setStatus(id, status, error: message.isEmpty ? nil : message)
+        followUp(afterMission: id)
         if message.contains("facturación") || message.contains("límite de uso") { connectionStatus = "Límite de uso · revisa la facturación"; connectionReady = false; state.preferences.autonomous = false }
         if proactive { state.preferences.autonomous = false; addNote(title: "La misión necesita atención", text: message, fingerprint: "failure-" + id.uuidString, missionID: id) }
     }
     func stop(missionID: UUID? = nil) {
         guard let item = state.missions.first(where: { $0.id == (missionID ?? selectedMission) }), let runtime = runtimes[item.id], !runtime.cancelRequested else { return }
+        if item.engine == "direct" { runtime.cancelRequested = true; runtime.task?.cancel(); if computerOwner == item.id { computer.stop() }; return }
         guard let sid = item.sessionID else { notice = "La sesión aún se está creando. Espera a que aparezca para poder cancelarla sin dejar trabajo remoto."; return }
         runtime.cancelRequested = true
         Task {
@@ -387,7 +561,7 @@ import AVFoundation
             case "company": output = company.map { ["name": $0.name, "goal": $0.goal, "notes": $0.notes] } ?? ["workspace": "personal"]
             case "tasks": output["tasks"] = state.tasks.filter { $0.companyID == company?.id }.prefix(50).map { ["title": $0.title, "done": $0.done] as [String: Any] }
             case "memory": output["memory"] = settings.useMemory ? memoryContext(companyID: company?.id) : []
-            case "sources": output["source_summaries"] = settings.shareSources ? state.inbox.filter { $0.fingerprint.hasPrefix("mail-") || $0.fingerprint.hasPrefix("calendar-") }.prefix(30).map { ["title": $0.title, "text": $0.text] } : []; output["sharing_enabled"] = settings.shareSources
+            case "sources": exposedConversations.insert(missionID); output["source_summaries"] = settings.shareSources ? state.inbox.filter { $0.fingerprint.hasPrefix("mail-") || $0.fingerprint.hasPrefix("calendar-") }.prefix(30).map { ["title": $0.title, "text": $0.text] } : []; output["sharing_enabled"] = settings.shareSources
             default: throw AsterError.message("Consulta del espacio de trabajo no válida.")
             }
         case "aster_create_task":
@@ -398,6 +572,8 @@ import AVFoundation
             if existing == nil { state.tasks.insert(task, at: 0) }
             output = ["task_id": task.id.uuidString, "title": task.title, "saved": true, "external_action_executed": false]
         case "aster_remember":
+            // Outside content could plant false memories; those must come from the user directly.
+            guard !exposedConversations.contains(missionID) else { throw AsterError.message("Memory is not saved from a conversation that read outside content. Ask the user to add it in Memory or say it in a new conversation.") }
             guard settings.automaticMemory, let text = call.arguments["text"] as? String, !text.contains("sk-"), !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, text.count <= 8000 else { throw AsterError.message("No se permite guardar esta memoria.") }
             if !state.memories.contains(where: { $0.text == text && $0.companyID == company?.id }) { state.memories.insert(.init(text: text, companyID: company?.id), at: 0) }
             output = ["remembered": true]
@@ -436,9 +612,13 @@ import AVFoundation
     }
     func speak(_ text: String, agentID: String? = nil) {
         if voice.active { voice.stop(); return }
+        say(text, agentID: agentID)
+    }
+    func say(_ text: String, agentID: String? = nil) {
         let fallback = UserDefaults.standard.string(forKey: "AsterLanguage") ?? "es"
         let language = settings.responseLanguage == "auto" ? VoiceText.language(text, fallback: fallback) : settings.responseLanguage
-        voice.say(text, natural: state.preferences.voiceEngine != "system", voice: state.preferences.agentVoices?[agentID ?? agent.id] ?? state.preferences.voice ?? AsterVoice.defaultID(agentID ?? agent.id), language: language, tone: settings.tone)
+        // Natural voices are OpenAI's; with Claude alone Aster speaks with the voices of macOS.
+        voice.say(text, natural: state.preferences.voiceEngine != "system" && (!settings.usesClaude || AIProvider.openai.hasKey), voice: state.preferences.agentVoices?[agentID ?? agent.id] ?? state.preferences.voice ?? AsterVoice.defaultID(agentID ?? agent.id), language: language, tone: settings.tone)
     }
     func addNote(title: String, text: String, fingerprint: String, missionID: UUID? = nil) {
         guard !state.inbox.contains(where: { $0.fingerprint == fingerprint }) else { return }
@@ -463,6 +643,29 @@ import AVFoundation
                 calendarStatus = state.preferences.watchCalendar ? "Conectado" : "Permiso denegado"; save()
                 if state.preferences.watchCalendar { await scan(manual: true) }
             } catch { calendarStatus = error.localizedDescription }
+        }
+    }
+    /// The full startup kickoff: a coordinated mission where every department prepares its deliverable.
+    @discardableResult func launchStartup(_ companyID: UUID, background: Bool = false) -> Bool {
+        guard companies.contains(where: { $0.id == companyID }) else { return false }
+        return run(L(Self.startupBrief), companyID: companyID, fresh: true, specialistID: "director", background: background)
+    }
+    static let startupBrief = """
+    Arranca esta startup desde cero con todos sus departamentos. Coordina especialistas en paralelo y entrega un paquete revisable en /workspace/outputs:
+    00-resumen.md: la startup en una página y las cinco decisiones más importantes.
+    01-estrategia.md: problema, cliente ideal, propuesta de valor, modelo de negocio y precios, con supuestos explícitos.
+    02-mercado.md: tamaño de mercado con supuestos, competidores y alternativas con fuentes citadas, y riesgos.
+    03-producto.md: alcance del MVP, historias de usuario, arquitectura técnica recomendada y plan de seis semanas.
+    04-growth.md: posicionamiento, canales, plan de lanzamiento, cómo conseguir los primeros 50 clientes y calendario de contenido de cuatro semanas.
+    05-finanzas.csv y 05-finanzas.md: economía unitaria, modelo mensual a 12 meses, runway y opciones de financiación, marcando qué es estimación.
+    06-legal-operaciones.md: puntos a revisar con un profesional (forma jurídica, propiedad intelectual, privacidad), herramientas y procesos. No es asesoramiento legal.
+    Después crea en Aster las tareas de los próximos siete días con aster_create_task. No publiques, no contrates, no gastes dinero ni envíes nada: deja todo preparado para que yo lo revise.
+    """
+    func connectNotes() {
+        Task {
+            notesStatus = "Solicitando acceso a Apple Notas"
+            do { _ = try await AppleNotes.search("", limit: 1); state.preferences.watchNotes = true; notesStatus = "Conectado"; save() }
+            catch { state.preferences.watchNotes = false; notesStatus = error.localizedDescription; save() }
         }
     }
     func connectMail() {

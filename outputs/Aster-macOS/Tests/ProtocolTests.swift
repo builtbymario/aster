@@ -1,14 +1,18 @@
 import Foundation
+import XCTest
+@testable import Aster
 
-@main struct ProtocolTests {
+final class ProtocolTests: XCTestCase {
+    /// Root outcomes, subagents, billing errors, UTF8/CRLF event frames, truncated frame recovery, persistence and default consent state.
+    func testAgentEventsAndPersistence() throws { try Self.run() }
     static func event(_ json: String) -> AgentEvent? { AgentEvent.decode(Data(json.utf8)) }
-    static func check(_ condition: @autoclosure () -> Bool, _ message: String) { if !condition() { fatalError(message) } }
-    static func main() throws {
-        if case .completed? = event(#"{"type":"agent.session.turn.completed","turn":{"id":"root","subagent_id":null}}"#) {} else { fatalError("Root completion must terminate the intended turn") }
+    static func check(_ condition: @autoclosure () -> Bool, _ message: String = "", file: StaticString = #filePath, line: UInt = #line) { XCTAssertTrue(condition(), message, file: file, line: line) }
+    static func run() throws {
+        if case .completed? = event(#"{"type":"agent.session.turn.completed","turn":{"id":"root","subagent_id":null}}"#) {} else { XCTFail("Root completion must terminate the intended turn") }
         check(event(#"{"type":"agent.session.turn.completed","turn":{"subagent_id":"worker"}}"#) == nil, "Subagent completion must not finish root")
         check(event(#"{"type":"agent.session.idle"}"#) == nil, "Idle is not completion")
-        if case .failure(let text)? = event(#"{"type":"agent.session.turn.failed","turn":{"subagent_id":null,"error":{"code":"usage_limit_exceeded","message":"Billing limit"}}}"#) { check(text.contains("facturación"), "Translate billing failure") } else { fatalError("Root failure must surface") }
-        if case .activity? = event(#"{"type":"agent.session.turn.failed","turn":{"subagent_id":"worker","error":{"message":"Failed"}}}"#) {} else { fatalError("A worker failure should not silently replace root outcome") }
+        if case .failure(let text)? = event(#"{"type":"agent.session.turn.failed","turn":{"subagent_id":null,"error":{"code":"usage_limit_exceeded","message":"Billing limit"}}}"#) { check(text.contains("facturación"), "Translate billing failure") } else { XCTFail("Root failure must surface") }
+        if case .activity? = event(#"{"type":"agent.session.turn.failed","turn":{"subagent_id":"worker","error":{"message":"Failed"}}}"#) {} else { XCTFail("A worker failure should not silently replace root outcome") }
         check(event(Data([0xFF]).base64EncodedString()) == nil, "Reject malformed JSON")
         var parser = SSEParser(); var output: [String] = []; var completions = 0
         let stream = ": keepalive\r\nevent: delta\r\ndata: {\"type\":\"agent.session.turn.output_text.delta\",\"item_id\":\"a\",\"delta\":\"Hola, creación ✨\"}\r\n\r\ndata: {\"type\":\"agent.session.turn.completed\",\"turn\":{\"subagent_id\":null}}\n\n"
@@ -33,13 +37,12 @@ import Foundation
         check(multiline.append("") == nil, "Idle multiline event does not indicate success")
         var truncated = SSEParser()
         for b in #"data: {"type":"agent.session.turn.cancelled","turn":{"subagent_id":null}}"#.utf8 { _ = try truncated.feed(b) }
-        if case .cancelled? = truncated.finish() {} else { fatalError("Recover final frame without newline") }
+        if case .cancelled? = truncated.finish() {} else { XCTFail("Recover final frame without newline") }
         var state = SavedState(); state.specialists[0].style = .init(form: .orbit, tint: .mint, size: 184, effects: false, motion: false)
         state.missions = [.init(title: "Misión", specialistID: "director", messages: [.init(role: "user", text: "Crear")], sessionID: "session", turnID: "turn", status: "Por recuperar")]
         let restored = try JSONDecoder().decode(SavedState.self, from: JSONEncoder().encode(state))
         check(restored.specialists[0].style == state.specialists[0].style, "Persist customization")
         check(restored.missions[0].sessionID == "session" && restored.missions[0].turnID == "turn", "Keep remote identity for recovery")
         check(!restored.preferences.watchMail && !restored.preferences.watchCalendar && !restored.preferences.autonomous, "Default private connectors and autonomous billing off")
-        print("PASS: root outcomes, subagents, billing errors, UTF8/CRLF event frames, truncated frame recovery, persistence and default consent state.")
     }
 }

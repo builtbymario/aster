@@ -20,6 +20,8 @@ node_modules/
 .vinext/
 dist/
 DerivedData/
+.build/
+.swiftpm/
 xcuserdata/
 *.xcuserstate
 *.tsbuildinfo
