@@ -142,9 +142,9 @@ struct SettingsView: View {
         VStack(spacing: 18) {
             card("Trabajo autónomo", icon: "moon.stars") {
                 Toggle(L("Preparar trabajo sin esperar mi mensaje"), isOn: preference(\.autonomous)).toggleStyle(.switch).disabled(store.companies.isEmpty)
-                Text(LF("Aster revisa el objetivo y las tareas de la empresa, prepara una propuesta y te escribe cuando termina. Cada misión usa tu saldo de %@.", store.settings.providerName)).font(.system(size: 11)).foregroundStyle(.secondary).lineSpacing(4)
-                Picker(L("Empresa"), selection: preference(\.autonomousCompanyID)) {
-                    Text(L("Rotar entre mis empresas")).tag(nil as UUID?)
+                Text(LF("Aster revisa el objetivo y las tareas del proyecto, prepara una propuesta y te escribe cuando termina. Cada misión usa tu saldo de %@.", store.settings.providerName)).font(.system(size: 11)).foregroundStyle(.secondary).lineSpacing(4)
+                Picker(L("Proyecto"), selection: preference(\.autonomousCompanyID)) {
+                    Text(L("Rotar entre mis proyectos")).tag(nil as UUID?)
                     ForEach(store.companies) { Text($0.name).tag(Optional($0.id)) }
                 }
                 HStack {
@@ -159,7 +159,7 @@ struct SettingsView: View {
                 TextEditor(text: Binding(get: { store.state.preferences.autonomousBrief ?? "" }, set: { store.state.preferences.autonomousBrief = $0; store.save() })).font(.system(size: 12)).frame(height: 75).scrollContentBackground(.hidden).padding(10).background(.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 12))
                 Text(LF("Misiones iniciadas hoy: %d de %d", store.state.preferences.dailyRuns, store.state.preferences.dailyLimit)).font(.system(size: 11)).foregroundStyle(.secondary)
                 if let next = store.nextAutonomous { Text(L("Próxima revisión a partir de:") + " " + next.formatted(date: .abbreviated, time: .shortened)).font(.system(size: 11)).foregroundStyle(.secondary) }
-                if store.companies.isEmpty { Text(L("Añade una empresa para activar estas misiones.")).font(.system(size: 11)).foregroundStyle(.secondary) }
+                if store.companies.isEmpty { Text(L("Añade un proyecto para activar estas misiones.")).font(.system(size: 11)).foregroundStyle(.secondary) }
                 Text(L("El trabajo autónomo se pausa cuando una misión falla. Revisa la bandeja antes de volver a activarlo.")).font(.system(size: 10)).foregroundStyle(.secondary)
             }
             card("Siempre cerca", icon: "macwindow.on.rectangle") {

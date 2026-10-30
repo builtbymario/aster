@@ -43,6 +43,9 @@ import Combine
     @Published var connectionStatus = "Sin comprobar"
     /// The first-run welcome covers the window until it is finished.
     @Published var onboarding = false
+    /// The project open in Projects, and the one Missions is filtered by.
+    @Published var selectedProject: UUID?
+    @Published var projectFilter: UUID?
     @Published var connectionReady = false
     @Published var availableModels: [String] = []
     @Published var checkingConnection = false
@@ -181,6 +184,12 @@ import Combine
     func select(_ id: String) { state.preferences.selectedAgent = id; save() }
     func updateAgent(_ agent: Specialist) { if let index = state.specialists.firstIndex(where: { $0.id == agent.id }) { state.specialists[index] = agent; save() } }
     func createCompany(name: String, goal: String, notes: String = "") { updateCompany(.init(name: name, goal: goal, notes: notes)) }
+    /// Creates a project from a template and returns it, ready for its conversation.
+    @discardableResult func createProject(name: String, goal: String, notes: String = "", kind: String, modes: [String]? = nil) -> Company? {
+        let project = Company(name: name, goal: goal, notes: notes, kind: kind, modes: modes)
+        updateCompany(project)
+        return companies.first { $0.id == project.id }
+    }
     func updateCompany(_ company: Company) {
         var company = company; company.name = company.name.trimmingCharacters(in: .whitespacesAndNewlines); company.goal = company.goal.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !company.name.isEmpty, !company.goal.isEmpty else { return }
@@ -289,6 +298,44 @@ import Combine
     func newDesktopConversation(agentID: String) {
         guard !isRunning(desktopMission(for: agentID)?.id) else { return }
         state.desktopChats.removeValue(forKey: agentID); save()
+    }
+    /// The project's own conversation, if it has started.
+    func projectChat(_ projectID: UUID) -> Mission? {
+        guard let chat = state.companies.first(where: { $0.id == projectID })?.chatID else { return nil }
+        return state.missions.first { $0.id == chat && $0.archived != true }
+    }
+    /// Talks to Aster inside a project: Auto with only the project's team, and its goal, memory,
+    /// tasks and recent work in every turn.
+    @discardableResult func sendProject(_ text: String, projectID: UUID, spoken: Bool = false) -> Bool {
+        let text = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty, hasCapacity, let project = companies.first(where: { $0.id == projectID }), let auto = state.specialists.first(where: { $0.id == "director" }) else { return false }
+        if let chat = projectChat(projectID) { guard !isRunning(chat.id) else { return false } }
+        else {
+            state.missions.insert(.init(title: project.name, specialistID: auto.id, companyID: project.id), at: 0)
+            if let index = state.companies.firstIndex(where: { $0.id == projectID }) { state.companies[index].chatID = state.missions[0].id }
+        }
+        guard let index = state.missions.firstIndex(where: { $0.id == projectChat(projectID)?.id }) else { return false }
+        if spoken { spokenTurns.insert(state.missions[index].id) }
+        return runQuick(text, index: index, agent: auto)
+    }
+    /// Starts the project's conversation afresh; the previous one stays in Missions.
+    func newProjectConversation(_ projectID: UUID) {
+        guard let index = state.companies.firstIndex(where: { $0.id == projectID }), !isRunning(projectChat(projectID)?.id) else { return }
+        state.companies[index].chatID = nil; save()
+    }
+    /// A template action: the startup kickoff runs as a mission that reports back in the project's
+    /// conversation; everything else is asked in that conversation.
+    @discardableResult func startProjectAction(_ action: ProjectTemplate.Action, projectID: UUID) -> Bool {
+        guard action.kickoff else { return sendProject(L(action.prompt), projectID: projectID) }
+        guard launchStartup(projectID, background: true), let mission = state.missions.first else { return false }
+        if projectChat(projectID) == nil, let auto = state.specialists.first(where: { $0.id == "director" }), let project = companies.first(where: { $0.id == projectID }) {
+            state.missions.insert(.init(title: project.name, specialistID: auto.id, companyID: projectID), at: 1)
+            if let index = state.companies.firstIndex(where: { $0.id == projectID }) { state.companies[index].chatID = state.missions[1].id }
+        }
+        guard let chat = projectChat(projectID), let index = state.missions.firstIndex(where: { $0.id == chat.id }) else { return true }
+        if let started = state.missions.firstIndex(where: { $0.id == mission.id }) { state.missions[started].parentChat = chat.id; state.missions[started].title = L("Lanzar startup") }
+        state.missions[index].messages.append(.init(role: "assistant", text: L("He puesto a trabajar a todos los departamentos en paralelo: estrategia, mercado, producto, growth, finanzas y legal. Te aviso aquí en cuanto esté listo.")))
+        save(); return true
     }
     @discardableResult func sendDesktop(_ text: String, agentID: String, spoken: Bool = false, screen: Bool = false) -> Bool {
         guard state.specialists.contains(where: { $0.id == agentID }) else { return false }
@@ -399,9 +446,12 @@ import Combine
         if let steps = state.missions[index].suggestions, !steps.isEmpty, history.last?.role == "assistant" { history[history.count - 1].text += "\n[[next: " + steps.joined(separator: " | ") + "]]" }
         state.missions[index].suggestions = nil
         let attached = mission?.attachments ?? []
+        // A project's conversation works only with the project's team and always knows the project.
+        let project = mission?.company ?? state.companies.first { $0.id == state.missions[index].companyID }
+        let modes = project.map { project in state.specialists.filter { $0.id == "director" || project.team.contains($0.id) } } ?? state.specialists
         let request = ChatTurnRequest(model: mission == nil ? settings.chatModel : settings.workModel, effort: mission == nil ? QuickChat.effort : settings.effort,
-                                      instructions: QuickChat.instructions(for: agent, settings: settings, modes: state.specialists, mission: mission != nil),
-                                      history: history, input: inputContext(text: text, company: mission?.company, attachments: attached, agentID: agent.id),
+                                      instructions: QuickChat.instructions(for: agent, settings: settings, modes: modes, mission: mission != nil, project: project),
+                                      history: history, input: inputContext(text: text, company: project, attachments: attached, agentID: agent.id),
                                       tools: mission == nil ? QuickChat.tools(settings: settings) : AgentAPI.functionTools(settings: settings), webSearch: settings.webSearch, attachments: attached)
         state.missions[index].engine = "direct"; state.missions[index].attachmentNames = (state.missions[index].attachmentNames ?? []) + attached.map(\.name)
         if !hidden { state.missions[index].messages.append(.init(role: "user", text: text + (screen ? "\n\n🖥 " + L("Con tu pantalla") : "") + (attached.isEmpty ? "" : "\n\n" + attached.map { "📎 " + $0.name }.joined(separator: "\n")))) }
