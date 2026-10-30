@@ -125,6 +125,20 @@ final class SafetyTests: XCTestCase {
         XCTAssertTrue(Self.secondOutput(bodies).contains("blocked"))
     }
 
+    @MainActor func testPerformWaitsForTheWholeRun() async throws {
+        let file = FileManager.default.temporaryDirectory.appendingPathComponent("aster-perform-" + UUID().uuidString)
+        try "OPENAI_API_KEY=isolated-fixture\n".write(to: file, atomically: true, encoding: .utf8); defer { try? FileManager.default.removeItem(at: file) }
+        let config = URLSessionConfiguration.ephemeral; config.protocolClasses = [DesktopMockProtocol.self]
+        let api = try AgentAPI(environmentFile: file.path, baseURL: "https://aster.test/v1", transport: URLSession(configuration: config))
+        var count = 0
+        DesktopMockProtocol.handler = { _ in count += 1; return try ComputerTests.response("p\(count)", action: count == 1 ? "observe" : "finish", extra: count == 1 ? [:] : ["text": "Listo."]) }
+        let desktop = GuardedDesktop(); desktop.target = ActionTarget(appName: "Numbers")
+        let run = await ComputerController().perform("Mira la hoja", agent: Specialist.defaults[0], settings: .init(), api: api, backend: desktop, needsPermissions: false)
+        XCTAssertEqual(run?.status, "Completada"); XCTAssertEqual(run?.result, "Listo.")
+        let refused = ComputerController(); let busy = await refused.perform("", agent: Specialist.defaults[0], settings: .init(), api: api, backend: desktop, needsPermissions: false)
+        XCTAssertNil(busy, "An empty task never starts")
+    }
+
     @MainActor func testAChangedScreenCancelsAnApprovedStep() async throws {
         let desktop = GuardedDesktop()
         let (_, bodies) = try await Self.run(desktop, first: ["action": "click", "x": 120, "y": 80]) { controller in

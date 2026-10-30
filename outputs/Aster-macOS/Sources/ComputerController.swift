@@ -17,6 +17,7 @@ import Combine
     /// The task was started or resumed from the iPhone: nobody is at the Mac to confirm, so sensitive steps are declined.
     var remoteSession = false
     private var decision: Bool?
+    private var waiters: [CheckedContinuation<ComputerRun, Never>] = []
     @Published var selectedDisplay = CGMainDisplayID()
     let preview = ScreenPreview()
     lazy var desktop = MacDesktop(preview: preview)
@@ -135,10 +136,10 @@ import Combine
     func resume(_ message: String = "") { guard active, paused, confirmation == nil else { return }; reply = message; question = ""; onBegin?(); paused = false; phase = "Continuando" }
     func stop(reason: String = "Tarea detenida") {
         guard active else { return }; job?.cancel(); deadline?.cancel(); generation = UUID(); active = false; paused = false; question = ""; confirmation = nil; decision = nil; phase = reason; cleanupMonitor(); onEnd?()
-        onFinished?(.init(task: taskText, agentID: runningAgentID, steps: steps, result: result, status: "Detenida"))
+        report(.init(task: taskText, agentID: runningAgentID, steps: steps, result: result, status: "Detenida"))
         Task { await desktop.stop() }
     }
-    private func finish(agentID: String, status: String) { active = false; paused = false; question = ""; deadline?.cancel(); cleanupMonitor(); onFinished?(.init(task: taskText, agentID: agentID, steps: steps, result: result.isEmpty ? error : result, status: status)); onEnd?(); Task { await desktop.stop() } }
+    private func finish(agentID: String, status: String) { active = false; paused = false; question = ""; deadline?.cancel(); cleanupMonitor(); report(.init(task: taskText, agentID: agentID, steps: steps, result: result.isEmpty ? error : result, status: status)); onEnd?(); Task { await desktop.stop() } }
     /// Pauses on a sensitive step until the user allows or declines it in Aster.
     private func confirm(_ reason: String, step: String, token: UUID) async throws -> Bool {
         if remoteSession { return false }
@@ -152,6 +153,17 @@ import Combine
         let allowed = decision == true
         paused = false; phase = allowed ? "Continuando" : "Sin hacer ese paso"; onBegin?()
         return allowed
+    }
+    /// Runs a task to the end and returns its record; nil when it could not start (its reason is in `error`).
+    func perform(_ text: String, agent: Specialist, settings: IntelligenceSettings, api: AgentAPI? = nil, backend: DesktopBackend? = nil, needsPermissions: Bool = true) async -> ComputerRun? {
+        start(text, agent: agent, settings: settings, api: api, backend: backend, needsPermissions: needsPermissions)
+        guard active else { return nil }
+        return await withCheckedContinuation { waiters.append($0) }
+    }
+    private func report(_ run: ComputerRun) {
+        onFinished?(run)
+        let waiting = waiters; waiters = []
+        for waiter in waiting { waiter.resume(returning: run) }
     }
     func approve() { if confirmation != nil { decision = true } }
     func deny() { if confirmation != nil { decision = false } }

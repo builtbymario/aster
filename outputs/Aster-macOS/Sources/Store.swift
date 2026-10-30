@@ -62,6 +62,10 @@ import Combine
     lazy var replySpeaker: (String, String) -> Void = { [weak self] text, agentID in self?.say(text, agentID: agentID) }
     /// Takes the screenshot for a question about the screen; replaceable so tests never capture the screen.
     lazy var screenCapture: () async throws -> Data = { try await ScreenSnapshot.capture() }
+    /// The quick chat whose request is operating the Mac, so stopping it stops the Mac too.
+    var computerOwner: UUID?
+    /// Runs a task on the Mac for the quick chat; replaceable so tests never move the cursor.
+    lazy var computerRunner: (String, Specialist, IntelligenceSettings) async -> ComputerRun? = { [weak self] task, mode, settings in await self?.computer.perform(task, agent: mode, settings: settings) }
     let computer = ComputerController()
     lazy var remote = MacRemoteBridge(store: self)
     private let apiFactory: () throws -> AgentAPI
@@ -322,7 +326,7 @@ import Combine
         }
         let request = ChatTurnRequest(model: settings.quickModel ?? settings.model, effort: QuickChat.effort, instructions: QuickChat.instructions(for: agent, settings: settings),
                                       history: QuickChat.history(state.missions[index].messages), input: inputContext(text: text, company: nil, attachments: [], agentID: agent.id),
-                                      tools: AgentAPI.functionTools(settings: settings), webSearch: settings.webSearch)
+                                      tools: QuickChat.tools(settings: settings), webSearch: settings.webSearch)
         state.missions[index].engine = "direct"; state.missions[index].attachmentNames = state.missions[index].attachmentNames ?? []
         state.missions[index].messages.append(.init(role: "user", text: text + (screen ? "\n\n🖥 " + L("Con tu pantalla") : "")))
         state.missions[index].messages.append(.init(role: "assistant", text: ""))
@@ -432,7 +436,7 @@ import Combine
     }
     func stop(missionID: UUID? = nil) {
         guard let item = state.missions.first(where: { $0.id == (missionID ?? selectedMission) }), let runtime = runtimes[item.id], !runtime.cancelRequested else { return }
-        if item.engine == "direct" { runtime.cancelRequested = true; runtime.task?.cancel(); return }
+        if item.engine == "direct" { runtime.cancelRequested = true; runtime.task?.cancel(); if computerOwner == item.id { computer.stop() }; return }
         guard let sid = item.sessionID else { notice = "La sesión aún se está creando. Espera a que aparezca para poder cancelarla sin dejar trabajo remoto."; return }
         runtime.cancelRequested = true
         Task {

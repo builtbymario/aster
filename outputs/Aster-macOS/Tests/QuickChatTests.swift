@@ -178,6 +178,33 @@ final class QuickChatTests: XCTestCase {
         XCTAssertEqual(provider.requests.count, 2, "Nothing is sent without the screenshot that was asked for")
     }
 
+    @MainActor func testTheQuickChatCanOperateTheMac() async throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("aster-agentic-" + UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        var toolOutput = ""
+        let provider = ScriptedChatProvider { request, tool, event in
+            XCTAssertTrue(request.tools.contains { $0["name"] as? String == "aster_computer" }, "The quick chat can act on the Mac")
+            toolOutput = try await tool(.init(turnID: "resp_c", callID: "call_mac", name: "aster_computer", arguments: ["task": "Crea una tabla de gastos en Numbers"]))
+            event(.text("m", "Hecho.")); return ""
+        }
+        let store = AsterStore(directory: folder, startServices: false, apiFactory: { throw AsterError.message("Unused") }, chatFactory: { provider })
+        var requested: [(String, String)] = []; var ownerDuringRun: UUID?
+        store.computerRunner = { task, mode, _ in
+            requested.append((task, mode.id)); ownerDuringRun = store.computerOwner
+            return ComputerRun(task: task, agentID: mode.id, steps: [.init(text: "Abro Numbers", action: "open_app"), .init(text: "No permitido · Enviar la tabla", action: "denied")], result: "Tabla creada con 4 columnas.", status: "Completada")
+        }
+        XCTAssertTrue(store.sendDesktop("Hazme una tabla de gastos en Numbers", agentID: "personal"))
+        for _ in 0..<100 where store.busy { try await Task.sleep(for: .milliseconds(10)) }
+        XCTAssertEqual(requested.first?.0, "Crea una tabla de gastos en Numbers"); XCTAssertEqual(requested.first?.1, "personal", "The task runs in the chat's mode")
+        XCTAssertEqual(ownerDuringRun, store.desktopMission(for: "personal")?.id, "Stopping the chat can stop the Mac")
+        XCTAssertNil(store.computerOwner)
+        let output = try XCTUnwrap(try JSONSerialization.jsonObject(with: Data(toolOutput.utf8)) as? [String: Any])
+        XCTAssertEqual(output["status"] as? String, "Completada"); XCTAssertEqual(output["result"] as? String, "Tabla creada con 4 columnas.")
+        XCTAssertEqual(output["not_done"] as? [String], ["No permitido · Enviar la tabla"], "The model hears what was declined")
+        XCTAssertEqual(store.desktopMission(for: "personal")?.status, "Completada")
+        XCTAssertFalse(AgentAPI.functionTools(settings: IntelligenceSettings()).contains { $0["name"] as? String == "aster_computer" }, "Hosted missions do not drive the local Mac")
+    }
+
     func testHistoryIsRecentAndBounded() {
         var messages = (1...30).map { Message(role: $0 % 2 == 0 ? "assistant" : "user", text: "Mensaje \($0)") }
         messages.append(.init(role: "assistant", text: ""))

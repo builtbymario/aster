@@ -107,7 +107,7 @@ extension AsterStore {
     }
     func handleTool(_ session: String, call: PendingToolCall, missionID: UUID) async throws -> String {
         if let receipt = state.toolReceipts.first(where: { $0.sessionID == session && $0.turnID == call.turnID && $0.callID == call.callID }) { return receipt.output }
-        guard ["aster_mail", "aster_calendar", "aster_reminders", "aster_notify", "aster_health"].contains(call.name) else { return try performTool(session, call: call, missionID: missionID) }
+        guard ["aster_mail", "aster_calendar", "aster_reminders", "aster_notify", "aster_health", "aster_computer"].contains(call.name) else { return try performTool(session, call: call, missionID: missionID) }
         var output: [String: Any] = [:]
         switch call.name {
         case "aster_health":
@@ -143,6 +143,17 @@ extension AsterStore {
                 output["reminders"] = items.filter { !$0.isCompleted && (query.isEmpty || ($0.title ?? "").localizedCaseInsensitiveContains(query)) }.prefix(100).map { ["id": $0.calendarItemIdentifier, "title": $0.title ?? "", "notes": $0.notes ?? "", "list": $0.calendar.title, "due": $0.dueDateComponents.flatMap { Calendar.current.date(from: $0) }?.formatted(.iso8601) ?? ""] }
             }
             await refreshReminders()
+        case "aster_computer":
+            guard let task = (call.arguments["task"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines), !task.isEmpty else { throw AsterError.message("Describe la tarea que hay que hacer en el Mac.") }
+            guard !computer.active else { throw AsterError.message("El Mac ya está haciendo otra tarea. Espera a que termine o detenla en Ordenador.") }
+            let mode = state.missions.first { $0.id == missionID }.flatMap { mission in state.specialists.first { $0.id == mission.specialistID } } ?? agent
+            setActivity("Trabajando en tu Mac", for: missionID); computerOwner = missionID
+            defer { computerOwner = nil }
+            guard let run = await computerRunner(String(task.prefix(4000)), mode, settings) else {
+                throw AsterError.message(computer.error.isEmpty ? "No se ha podido empezar la tarea en el Mac." : computer.error)
+            }
+            output = ["status": run.status, "result": run.result, "steps": run.steps.suffix(24).map(\.text),
+                      "not_done": run.steps.filter { ["denied", "blocked"].contains($0.action) }.map(\.text)]
         case "aster_notify":
             guard let text = call.arguments["text"] as? String, !text.isEmpty, let value = call.arguments["date"] as? String, let date = Self.parseDate(value) else { throw AsterError.message("El aviso necesita un texto y una fecha ISO 8601 con zona horaria.") }
             let recurrence = call.arguments["recurrence"] as? String ?? "none"

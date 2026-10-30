@@ -54,7 +54,12 @@ import SwiftUI
             if let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication, app.processIdentifier != ProcessInfo.processInfo.processIdentifier { Task { @MainActor in self?.lastTarget = app } }
         }
         store.computer.onBegin = { [weak self] in guard let self else { return }; self.coach.suspend(); self.window.orderOut(nil); self.companions.suspend(); self.lastTarget?.activate(options: []); self.computerHUD.orderFrontRegardless() }
-        store.computer.onEnd = { [weak self] in guard let self else { return }; self.computerHUD.orderOut(nil); self.companions.resume(); self.coach.resume(); self.store.page = "Ordenador"; self.openMain() }
+        store.computer.onEnd = { [weak self] in
+            guard let self else { return }; self.computerHUD.orderOut(nil); self.companions.resume(); self.coach.resume()
+            // A finished task asked for in the quick chat returns there with its result; pauses need Computer.
+            if !self.store.computer.active, self.store.computerOwner != nil { self.companions.showChat(self.companions.currentMode); return }
+            self.store.page = "Ordenador"; self.openMain()
+        }
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         statusItem.button?.image = AsterGlyph.menuBar()
         let menu = NSMenu()
