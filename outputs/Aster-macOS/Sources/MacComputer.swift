@@ -203,7 +203,10 @@ final class MacDesktop: NSObject, DesktopBackend, SCStreamOutput, SCStreamDelega
             guard !prohibited.contains(name.lowercased()), let url = Self.applicationURL(name) else { throw AsterError.message("Esa app no está disponible para esta tarea. Ábrela tú y continúa.") }
             let bundle = Bundle(url: url)?.bundleIdentifier ?? ""
             guard !["com.apple.Terminal", "com.googlecode.iterm2", "com.apple.ScriptEditor2", "com.apple.Automator", "com.apple.systempreferences", "com.apple.keychainaccess"].contains(bundle) else { throw AsterError.message("Abre tú esa app y continúa después.") }
-            try await NSWorkspace.shared.openApplication(at: url, configuration: NSWorkspace.OpenConfiguration())
+            let app = try await NSWorkspace.shared.openApplication(at: url, configuration: NSWorkspace.OpenConfiguration())
+            // Wait for the app to come to the front so the next screenshot shows it, not the previous one.
+            for _ in 0..<20 where NSWorkspace.shared.frontmostApplication?.processIdentifier != app.processIdentifier { try await Task.sleep(for: .milliseconds(100)) }
+            try await Task.sleep(for: .milliseconds(300))
         default: return
         }
         try await Task.sleep(for: .milliseconds(220)); try Task.checkCancellation()

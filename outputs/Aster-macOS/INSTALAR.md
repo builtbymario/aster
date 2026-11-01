@@ -4,10 +4,11 @@ Esta compilación es una **vista previa**. Tiene firma local de desarrollo; toda
 
 1. Abre la imagen de disco y arrastra Aster a Aplicaciones.
 2. Abre Aster. Si macOS bloquea la vista previa, espera a la versión con firma de Apple; no hace falta desactivar las protecciones del sistema.
-3. La bienvenida te pide elegir tu IA, **Claude** u **OpenAI**, y pegar tu propia clave de API (también desde Ajustes → Conexiones). La clave queda en el Llavero de este Mac.
-4. Activa individualmente las conexiones que quieras utilizar. Pantalla y Accesibilidad se autorizan en cada Mac.
-5. Para pasar tus conversaciones desde otro Mac, usa Guardar copia en el original y Restaurar copia en el nuevo.
-6. Para el iPhone, instala Aster Remote y escanea el código de Ajustes → Conexiones → Enlazar mi iPhone. Este paso requiere un Aster Relay publicado en Internet y su dirección `wss://`.
+3. La bienvenida te pide elegir tu IA, **Claude** u **OpenAI**, y pegar tu propia clave de API (también desde Ajustes → Conexiones). La clave queda en el Llavero de este Mac. Al final puedes dejar marcado **Abrir Aster al iniciar sesión** para tener la isla, ⌥Espacio y tus rutinas siempre listos.
+4. Mientras Aster no tenga firma de Apple, cada versión nueva pide una vez la contraseña del Mac para leer la clave del Llavero: escríbela y pulsa **Permitir siempre**. La versión firmada con Developer ID no lo pedirá en cada actualización.
+5. Activa individualmente las conexiones que quieras utilizar. Pantalla y Accesibilidad se autorizan en cada Mac.
+6. Para pasar tus conversaciones desde otro Mac, usa Guardar copia en el original y Restaurar copia en el nuevo.
+7. Para el iPhone, instala Aster Remote y escanea el código de Ajustes → Conexiones → Enlazar mi iPhone. Este paso requiere un Aster Relay publicado en Internet y su dirección `wss://`.
 
 Requisitos: macOS 14 o posterior; Apple Silicon o Intel. El paquete contiene las dos arquitecturas. Las pruebas de ejecución se han hecho en Apple Silicon; Intel se ha compilado, pero no se ha probado en hardware Intel.
 

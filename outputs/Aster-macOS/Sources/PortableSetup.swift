@@ -10,7 +10,7 @@ enum PortableSetup {
         // Another program could plant this file; accept only a private regular file owned by this user.
         guard let attributes = try? FileManager.default.attributesOfItem(atPath: url.path), isTrustedImport(attributes) else { return }
         do {
-            if try CredentialVault.read("openai-api-key") == nil {
+            if !CredentialVault.contains("openai-api-key") {
                 let value = try AgentAPI.keyFromFile(url.path)
                 guard !value.isEmpty else { return }; try CredentialVault.save(Data(value.utf8), account: "openai-api-key")
             }
@@ -57,7 +57,7 @@ struct AIConnectionView: View {
                    ? "Con Claude, el chat, las misiones, el control del Mac y las explicaciones de pantalla usan tu saldo de Anthropic. Las voces naturales son de OpenAI; sin esa clave, Aster habla con las voces de macOS."
                    : "Las respuestas, las misiones y la voz natural usan el saldo de tu cuenta de OpenAI.")).font(.caption2).foregroundStyle(.secondary)
             Text(L("Cada Mac utiliza su propia clave. No se incluye en el instalador ni se envía al iPhone.")).font(.caption2).foregroundStyle(.secondary)
-        }.padding(20).background(.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 20))
+        }.padding(22).frostedSurface(20)
     }
     private func connect(_ candidate: String) {
         guard !saving else { return }; saving = true; message = ""
@@ -128,7 +128,7 @@ struct RemoteSettingsView: View {
             }.font(.caption)
             if !loginMessage.isEmpty { Text(loginMessage).font(.caption2).foregroundStyle(.secondary) }
             Text("Mientras el acceso remoto está activo, Aster evita el reposo por inactividad. Cerrar la tapa, apagar el Mac o perder Internet interrumpe la conexión. Bloquearlo detiene la pantalla y el control.").font(.caption2).foregroundStyle(.secondary)
-        }.padding(20).background(.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 20))
+        }.padding(22).frostedSurface(20)
         .confirmationDialog("¿Desvincular el iPhone? Tendrás que escanear un código nuevo para volver a conectarlo.", isPresented: $confirmRevoke) { Button("Desvincular", role: .destructive) { remote.revoke(); reveal = false } }
     }
 }

@@ -22,6 +22,12 @@ import SwiftUI
         #else
         store = AsterStore()
         #endif
+        #if DEBUG
+        // A live check of the main uses on a separate workspace, without any window.
+        if ProcessInfo.processInfo.environment["ASTER_SELFCHECK"] == "1", let directory = ProcessInfo.processInfo.environment["ASTER_DATA_DIR"] {
+            store = nil; Task { await SelfCheck.run(directory: URL(fileURLWithPath: directory, isDirectory: true)) }; return
+        }
+        #endif
         _ = store.remote
         if store.needsOnboarding { store.onboarding = true }
         else if !(store.settings.usesClaude ? AIProvider.anthropic : .openai).hasKey { store.page = "Conexiones" }

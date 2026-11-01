@@ -14,7 +14,7 @@ struct ComputerWorkspaceView: View {
             VStack(alignment: .leading, spacing: 18) {
                 HStack(alignment: .top) {
                     VStack(alignment: .leading, spacing: 7) {
-                        Text(L("Una mano en tu Mac.")).font(.system(size: 30, weight: .semibold)).tracking(-0.8)
+                        Text(L("Una mano en tu Mac.")).font(.asterDisplay(30)).tracking(-0.8)
                         Text(L("Estudia, crea y trabaja con tus apps. Mira cada paso.")).font(.system(size: 12)).foregroundStyle(.secondary)
                     }
                     Spacer()

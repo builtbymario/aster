@@ -233,7 +233,7 @@ enum AIProvider: String, CaseIterable {
     var keyAccount: String { self == .anthropic ? AnthropicAPI.keyAccount : "openai-api-key" }
     var keysURL: URL { URL(string: self == .anthropic ? "https://console.anthropic.com/settings/keys" : "https://platform.openai.com/api-keys")! }
     var billingURL: URL { URL(string: self == .anthropic ? "https://console.anthropic.com/settings/billing" : "https://platform.openai.com/settings/organization/billing/")! }
-    var hasKey: Bool { (try? CredentialVault.read(keyAccount)) != nil }
+    var hasKey: Bool { CredentialVault.contains(keyAccount) }
     /// Checks a key by listing the models it can use, newest first.
     func models(key: String) async throws -> [String] {
         self == .anthropic ? try await AnthropicAPI(apiKey: key).availableModels() : try await AgentAPI(apiKey: key).availableModels()

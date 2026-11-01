@@ -235,7 +235,9 @@ import Combine
         Task {
             do {
                 let provider: AIProvider = settings.usesClaude ? .anthropic : .openai
-                guard let key = try CredentialVault.read(provider.keyAccount).flatMap({ String(data: $0, encoding: .utf8) }) else {
+                // Read off the main thread: after an update macOS may ask the user first, and Aster stays usable meanwhile.
+                let account = provider.keyAccount
+                guard let key = try await Task.detached(operation: { try CredentialVault.read(account) }).value.flatMap({ String(data: $0, encoding: .utf8) }) else {
                     throw AsterError.message(LF("Conecta %@ en Ajustes → Conexiones para empezar.", provider.name))
                 }
                 availableModels = try await provider.models(key: key)
