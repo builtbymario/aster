@@ -9,7 +9,7 @@ struct ActivityWorkspaceView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 HStack {
-                    VStack(alignment: .leading, spacing: 6) { Text(L("Tu equipo en marcha.")).font(.system(size: 29, weight: .semibold)); Text(L("Cada agente conserva su conversación y su trabajo.")).font(.system(size: 12)).foregroundStyle(.secondary) }
+                    VStack(alignment: .leading, spacing: 6) { Text(L("Tu equipo en marcha.")).font(.asterDisplay(29)); Text(L("Cada agente conserva su conversación y su trabajo.")).font(.system(size: 12)).foregroundStyle(.secondary) }
                     Spacer()
                     Picker(L("Trabajos simultáneos"), selection: Binding(get: { store.parallelLimit }, set: { store.state.preferences.parallelMissions = $0; store.save() })) { ForEach(1...6, id: \.self) { Text("\($0)").tag($0) } }.frame(width: 200)
                 }
@@ -67,7 +67,7 @@ private struct RoutineEditor: View {
     @State var routine: AgentRoutine
     var body: some View {
         VStack(alignment: .leading, spacing: 17) {
-            Text(L("Tu rutina")).font(.system(size: 24, weight: .semibold))
+            Text(L("Tu rutina")).font(.asterDisplay(24))
             TextField(L("Nombre"), text: $routine.title)
             HStack { Picker(L("Compañero"), selection: $routine.specialistID) { ForEach(store.state.specialists) { Text($0.name).tag($0.id) } }; Picker(L("Espacio"), selection: $routine.companyID) { Text(L("Personal")).tag(nil as UUID?); ForEach(store.companies) { Text($0.name).tag(Optional($0.id)) } } }
             Text(L("Qué debe hacer y cómo comprobar el resultado")).font(.system(size: 12))

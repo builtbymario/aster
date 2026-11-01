@@ -35,7 +35,7 @@ struct MainView: View {
                 pageContent
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .id(store.page)
-                    .transition(reduceMotion ? .identity : .opacity.combined(with: .offset(y: 8)))
+                    .transition(.opacity)
                 if !["Conexiones", "Memoria", "Tareas", "Ordenador", "Actividad", "Proyectos"].contains(store.page) { composer.transition(.opacity.combined(with: .move(edge: .bottom))) }
             }.frame(maxWidth: .infinity, maxHeight: .infinity)
         }
@@ -46,7 +46,7 @@ struct MainView: View {
         .tint(Color.asterAccent)
         .preferredColorScheme(AsterAppearance(rawValue: appearance)?.scheme)
         .environment(\.locale, Locale(identifier: language))
-        .animation(AsterMotion.spring(reduceMotion), value: store.page)
+        .animation(AsterMotion.quick(reduceMotion), value: store.page)
         .sheet(isPresented: $customizing) { CustomizeView(original: store.agent) { store.updateAgent($0) } }
         .sheet(item: $renamingMission) { RenameMissionView(mission: $0) }
         .background(Button(L("")) { composerFocused = true }.keyboardShortcut("l", modifiers: .command).hidden())
@@ -62,9 +62,8 @@ struct MainView: View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 11) {
                 CompanionAvatar(style: store.state.specialists.first { $0.id == "director" }?.style ?? AvatarStyle(), mood: store.mood(), dimension: 34, animateAtRest: false, framesPerSecond: 30)
-                Text("aster").font(.system(size: 21, weight: .semibold)).tracking(-0.6)
-            }.padding(.top, 22).padding(.bottom, 9)
-            MonoLabel("Personal AI · Mac", size: 9).padding(.bottom, 20)
+                Text("aster").font(.asterDisplay(23, weight: .bold)).tracking(-0.4)
+            }.padding(.top, 22).padding(.bottom, 24)
             ForEach(pages, id: \.0) { item in
                 Button { navigate(item.0) } label: {
                     HStack(spacing: 12) {
@@ -72,14 +71,13 @@ struct MainView: View {
                         Text(L(pageTitle(item.0))).font(.system(size: 12.5, weight: store.page == item.0 ? .semibold : .regular))
                         Spacer(minLength: 0)
                         if item.0 == "Bandeja" && store.unread > 0 {
-                            Text("\(store.unread)").font(.system(size: 9, weight: .semibold)).frame(minWidth: 17, minHeight: 17).foregroundStyle(Color.asterAccentText).background(Color.asterAccentSoft, in: Capsule())
+                            Text("\(store.unread)").font(.system(size: 9.5, weight: .bold, design: .rounded)).frame(minWidth: 18, minHeight: 17).foregroundStyle(Color.asterInk).background(Color.asterRing, in: Capsule())
                         }
                     }.padding(.horizontal, 10).frame(height: 32)
-                        .foregroundStyle(store.page == item.0 ? Color.primary : Color.secondary)
+                        .foregroundStyle(store.page == item.0 ? Color.asterAccentText : Color.secondary)
                         .background {
                             if store.page == item.0 {
-                                RoundedRectangle(cornerRadius: 8, style: .continuous).fill(Color.asterRaised)
-                                    .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Color.asterHairline))
+                                Capsule(style: .continuous).fill(Color.asterAccentSoft)
                                     .matchedGeometryEffect(id: "navigation", in: navigationNamespace)
                             }
                         }
@@ -94,7 +92,7 @@ struct MainView: View {
                             Image(systemName: project.template.symbol).font(.system(size: 10, weight: .medium)).frame(width: 16).foregroundStyle(open ? Color.asterAccent : muted)
                             Text(project.name).font(.system(size: 11.5, weight: open ? .semibold : .regular)).lineLimit(1)
                             Spacer(minLength: 2)
-                            if store.isRunning(store.projectChat(project.id)?.id) { Circle().fill(Color.asterAccent).frame(width: 5, height: 5) }
+                            if store.isRunning(store.projectChat(project.id)?.id) { Circle().fill(Color.asterPollen).frame(width: 6, height: 6) }
                         }.foregroundStyle(open ? Color.primary : Color.secondary).frame(height: 26).padding(.horizontal, 10).contentShape(Rectangle())
                     }.buttonStyle(FluidButtonStyle())
                 }
@@ -125,14 +123,14 @@ struct MainView: View {
     }
     private var toolbar: some View {
         HStack(spacing: 10) {
-            Text(L(pageTitle(store.page))).font(.system(size: 15, weight: .semibold)).tracking(-0.2).padding(.leading, 6)
+            Text(L(pageTitle(store.page))).font(.asterDisplay(17)).padding(.leading, 6).opacity(store.page == "Personajes" ? 0 : 1)
             Spacer()
             LiquidGroup(spacing: 12) {
                 HStack(spacing: 10) {
                     HStack(spacing: 7) {
-                        Circle().fill(store.connectionReady ? Color.green : Color.orange).frame(width: 5, height: 5)
+                        Circle().fill(store.busy ? Color.asterPollen : store.connectionReady ? Color.green : Color.orange).frame(width: 6, height: 6)
                         Text(L(store.busy ? "Trabajando" : store.connectionStatus.hasPrefix("Conectado a") ? "Conectado" : store.connectionReady ? "Clave válida" : "Conexión pendiente")).font(.system(size: 10, weight: .medium))
-                    }.padding(.horizontal, 13).frame(height: 34).liquidSurface(18)
+                    }.padding(.horizontal, 13).frame(height: 30).background(Color.asterSurface, in: Capsule()).overlay(Capsule().strokeBorder(Color.asterHairlineStrong, lineWidth: 0.5))
                     GlassIconButton(symbol: AsterAppearance(rawValue: appearance)?.symbol ?? "circle.lefthalf.filled", title: "Apariencia") { choosingAppearance = true }
                         .popover(isPresented: $choosingAppearance, arrowEdge: .bottom) { appearancePicker }
                     GlassIconButton(symbol: "gearshape", title: "Ajustes") { navigate("Conexiones") }
@@ -166,66 +164,89 @@ struct MainView: View {
         default: characters
         }
     }
-    private func navigate(_ page: String) { withAnimation(AsterMotion.spring(reduceMotion)) { store.page = page } }
+    private func navigate(_ page: String) { withAnimation(AsterMotion.quick(reduceMotion)) { store.page = page } }
     private func select(_ id: String) { withAnimation(AsterMotion.spring(reduceMotion)) { store.select(id) } }
+    /// Home: Aster greets the user, says what is waiting for them and offers its modes.
     private var characters: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 14) {
-                HStack(alignment: .center) {
-                    VStack(alignment: .leading, spacing: 8) {
-                        MonoLabel(L("Tu compañero de IA"), size: 9)
-                        Text(L("Un Aster. Todos sus modos.")).font(.system(size: 30, weight: .semibold)).tracking(-1)
-                        Text(L("Elige cómo te ayuda: cada modo guarda su conversación, su voz y su forma de trabajar.")).font(.system(size: 12)).foregroundStyle(muted)
-                    }
-                    Spacer(minLength: 8)
-                    GlassAction(title: "Personalizar", symbol: "paintbrush.pointed") { customizing = true }
-                }.padding(.top, 6)
-                characterHero
-                HStack {
-                    MonoLabel(L("Modos"), size: 9)
-                    Spacer()
-                    MonoLabel(LF("Un compañero · %d modos", store.state.specialists.count), size: 9)
-                }.padding(.top, 2)
-                agentDock
-                HStack(spacing: 10) {
-                    starter("Pensar una idea", symbol: "lightbulb", text: "Ayúdame a explorar una idea. Empieza con una pregunta útil y propón enfoques concretos.")
-                    starter("Crear algo nuevo", symbol: "wand.and.stars", text: "Quiero crear algo original. Ayúdame a encontrar una dirección y convertirla en un primer resultado.")
-                    starter("Hacer avanzar un proyecto", symbol: "arrow.up.right", text: "Ayúdame a elegir el próximo paso de mayor impacto para uno de mis proyectos y convertirlo en un plan concreto.")
-                }
-            }.padding(.horizontal, 10).padding(.bottom, 18)
+            VStack(alignment: .leading, spacing: 30) {
+                greeting
+                modes
+                suggestions
+            }.padding(.horizontal, 22).padding(.top, 4).padding(.bottom, 18).frame(maxWidth: 860, alignment: .leading)
         }.scrollIndicators(.hidden)
     }
-    private var characterHero: some View {
-        HStack(spacing: 6) {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack(spacing: 6) { Image(systemName: store.agent.symbol).font(.system(size: 9, weight: .medium)); MonoLabel(store.agent.mode + " · " + L(store.agent.role), color: .asterAccentText) }
-                    .foregroundStyle(Color.asterAccentText).padding(.horizontal, 8).padding(.vertical, 5).background(Color.asterAccentSoft, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
-                Text("Aster").font(.system(size: 32, weight: .semibold)).tracking(-0.9)
-                Text(L(store.agent.detail)).font(.system(size: 12)).foregroundStyle(muted).lineSpacing(5).frame(maxWidth: 300, alignment: .leading).contentTransition(.opacity)
-            }.padding(.leading, 25).padding(.vertical, 20)
-            Spacer(minLength: 2)
-            AvatarStage(style: store.agent.style, mood: store.mood(for: store.agent.id) == .calm ? store.previewMood : store.mood(for: store.agent.id), dimension: 224)
-                .id(store.agent.id).transition(reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 0.90))).padding(.trailing, 14)
-        }.frame(maxWidth: .infinity, minHeight: 239).frostedSurface(28)
-        .animation(AsterMotion.spring(reduceMotion), value: store.agent.id)
+    private var greetingText: String {
+        let hour = Calendar.current.component(.hour, from: Date())
+        let base = L(hour < 6 || hour >= 21 ? "Buenas noches" : hour < 14 ? "Buenos días" : "Buenas tardes")
+        let name = store.settings.userName.trimmingCharacters(in: .whitespacesAndNewlines)
+        return name.isEmpty ? base : base + ", " + name
     }
-    private var agentDock: some View {
-        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 5), spacing: 8) {
-            ForEach(Specialist.modeOrder.compactMap { id in store.state.specialists.first { $0.id == id } }) { agent in
-                let selected = store.agent.id == agent.id
-                Button { select(agent.id) } label: {
-                    VStack(alignment: .leading, spacing: 10) {
-                        Image(systemName: agent.symbol).font(.system(size: 13, weight: .medium)).foregroundStyle(selected ? Color.asterAccent : muted)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(agent.mode).font(.asterMono(11, weight: .semibold))
-                            // In English several roles equal the mode's name; the description reads better than a repeat.
-                            Text(L(agent.role).caseInsensitiveCompare(agent.mode) == .orderedSame ? L(agent.detail) : L(agent.role)).font(.system(size: 10)).foregroundStyle(muted).lineLimit(1)
-                        }
-                    }.frame(maxWidth: .infinity, alignment: .leading).padding(12).frostedSurface(12)
-                        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(selected ? Color.asterAccent : .clear, lineWidth: 1))
-                }.buttonStyle(FluidButtonStyle()).accessibilityAddTraits(selected ? .isSelected : [])
+    private var greeting: some View {
+        HStack(alignment: .center, spacing: 26) {
+            AvatarStage(style: store.agent.style, mood: store.mood(for: store.agent.id) == .calm ? store.previewMood : store.mood(for: store.agent.id), dimension: 150)
+                .id(store.agent.id).transition(reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 0.92)))
+            VStack(alignment: .leading, spacing: 12) {
+                Text(greetingText).font(.asterDisplay(36)).tracking(-0.8).lineLimit(2)
+                Text(L(store.busy ? "Estoy trabajando en lo que me pediste. Puedes seguir hablándome mientras." : "Cuéntame qué tienes entre manos y lo hacemos juntos."))
+                    .font(.system(size: 14)).foregroundStyle(muted).fixedSize(horizontal: false, vertical: true)
+                HStack(spacing: 8) {
+                    let pending = store.state.tasks.filter { !$0.done }.count
+                    if store.busy { glance(LF("%d en marcha", store.state.missions.filter { store.isRunning($0.id) }.count), symbol: "sparkle", presence: true) { navigate("Misiones") } }
+                    if store.unread > 0 { glance(LF("%d novedades", store.unread), symbol: "tray") { navigate("Bandeja") } }
+                    if pending > 0 { glance(LF("%d tareas pendientes", pending), symbol: "checklist") { navigate("Tareas") } }
+                    if !store.busy && store.unread == 0 && pending == 0 { glance(L("Todo al día"), symbol: "checkmark", action: nil) }
+                }.padding(.top, 2)
             }
-        }.padding(.vertical, 5)
+            Spacer(minLength: 0)
+        }.animation(AsterMotion.spring(reduceMotion), value: store.agent.id)
+    }
+    /// A small fact about the user's day that opens where it lives.
+    private func glance(_ title: String, symbol: String, presence: Bool = false, action: (() -> Void)?) -> some View {
+        Button { action?() } label: {
+            HStack(spacing: 6) { Image(systemName: symbol).font(.system(size: 10, weight: .semibold)); Text(title).font(.system(size: 11.5, weight: .medium)) }
+                .foregroundStyle(presence ? Color.asterPollen : Color.primary.opacity(0.8))
+                .padding(.horizontal, 11).padding(.vertical, 6)
+                .background(presence ? Color.asterPollenSoft : Color.asterSurface, in: Capsule(style: .continuous))
+                .overlay(Capsule(style: .continuous).strokeBorder(Color.asterHairline, lineWidth: 1))
+        }.buttonStyle(FluidButtonStyle()).disabled(action == nil)
+    }
+    private var modes: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(L("Modos")).font(.asterDisplay(17))
+                Spacer()
+                Button { customizing = true } label: { Label(L("Personalizar"), systemImage: "paintbrush.pointed").font(.system(size: 11.5, weight: .medium)) }.buttonStyle(.plain).foregroundStyle(Color.asterAccent)
+            }
+            FlowLayout(spacing: 8) {
+                ForEach(Specialist.modeOrder.compactMap { id in store.state.specialists.first { $0.id == id } }) { agent in
+                    let selected = store.agent.id == agent.id
+                    Button { select(agent.id) } label: {
+                        HStack(spacing: 7) {
+                            Image(systemName: agent.symbol).font(.system(size: 11, weight: .semibold))
+                            Text(agent.mode).font(.asterDisplay(13, weight: .medium))
+                        }.foregroundStyle(selected ? Color.asterOnAccent : Color.primary)
+                            .padding(.horizontal, 14).padding(.vertical, 8)
+                            .background(selected ? AnyShapeStyle(Color.asterAccent) : AnyShapeStyle(Color.asterSurface), in: Capsule(style: .continuous))
+                            .overlay(Capsule(style: .continuous).strokeBorder(selected ? Color.clear : Color.asterHairlineStrong, lineWidth: 0.5))
+                    }.buttonStyle(FluidButtonStyle()).accessibilityAddTraits(selected ? .isSelected : [])
+                }
+            }
+            Text(L(store.agent.detail)).font(.system(size: 12.5)).foregroundStyle(muted).lineSpacing(4).frame(maxWidth: 560, alignment: .leading)
+                .contentTransition(.opacity).animation(AsterMotion.quick(reduceMotion), value: store.agent.id)
+        }
+    }
+    private var suggestions: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(L("Para empezar")).font(.asterDisplay(17))
+            VStack(spacing: 0) {
+                starter("Pensar una idea", detail: "Una pregunta útil y enfoques concretos", symbol: "lightbulb", text: "Ayúdame a explorar una idea. Empieza con una pregunta útil y propón enfoques concretos.")
+                Rectangle().fill(Color.asterHairline).frame(height: 1).padding(.leading, 52)
+                starter("Crear algo nuevo", detail: "De una dirección a un primer resultado", symbol: "wand.and.stars", text: "Quiero crear algo original. Ayúdame a encontrar una dirección y convertirla en un primer resultado.")
+                Rectangle().fill(Color.asterHairline).frame(height: 1).padding(.leading, 52)
+                starter("Hacer avanzar un proyecto", detail: "El próximo paso con más impacto, hecho plan", symbol: "arrow.up.forward", text: "Ayúdame a elegir el próximo paso de mayor impacto para uno de mis proyectos y convertirlo en un plan concreto.")
+            }.frostedSurface(18)
+        }
     }
     private var composer: some View {
         VStack(spacing: 8) {
@@ -241,14 +262,14 @@ struct MainView: View {
                     .lineLimit(1...4).font(.system(size: 13)).textFieldStyle(.plain).focused($composerFocused).onSubmit { submit() }
                 Button { if store.mainWorking { store.stop() } else { submit() } } label: {
                     Image(systemName: store.mainWorking ? "stop.fill" : "arrow.up").font(.system(size: 13, weight: .semibold)).frame(width: 32, height: 32)
-                        .foregroundStyle(Color.asterOnAccent).background(Color.asterAccent, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+                        .foregroundStyle(Color.asterOnAccent).background(Color.asterAccent, in: Circle())
                         .contentTransition(.symbolEffect(.replace))
                 }.buttonStyle(FluidButtonStyle()).disabled(!store.mainWorking && draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty).accessibilityLabel(L(store.mainWorking ? "Detener misión" : "Enviar misión"))
             }.padding(.horizontal, 15).padding(.vertical, 13).frostedSurface(25)
                 .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(composerFocused ? Color.asterAccent.opacity(0.7) : .clear, lineWidth: 1))
                 .animation(AsterMotion.quick(reduceMotion), value: composerFocused)
             HStack(spacing: 6) {
-                Circle().fill(Color.asterAccent).frame(width: 4, height: 4)
+                Circle().fill(store.mainWorking ? Color.asterPollen : Color.asterAccent).frame(width: 5, height: 5)
                 MonoLabel(store.mainWorking ? L(store.activity) : store.agent.title + " · " + L(store.agent.role), size: 9)
                 Spacer()
                 Menu {
@@ -261,8 +282,20 @@ struct MainView: View {
         guard !store.mainWorking, store.hasCapacity, !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
         if store.run(draft, fresh: store.page != "Misiones" || store.mission == nil) { draft = "" }
     }
-    private func starter(_ title: String, symbol: String, text: String) -> some View {
-        Button { draft = L(text); composerFocused = true } label: { HStack(spacing: 7) { Image(systemName: symbol).font(.system(size: 10)); Text(L(title)).font(.system(size: 10, weight: .medium)).lineLimit(1); Spacer(minLength: 1); Image(systemName: "arrow.up.left").font(.system(size: 8)) }.padding(12).frame(maxWidth: .infinity).liquidSurface(16, interactive: true) }.buttonStyle(FluidButtonStyle(lift: 1))
+    private func starter(_ title: String, detail: String, symbol: String, text: String) -> some View {
+        Button { draft = L(text); composerFocused = true } label: {
+            HStack(spacing: 14) {
+                Image(systemName: symbol).font(.system(size: 13, weight: .medium)).foregroundStyle(Color.asterAccent).frame(width: 26, height: 26).background(Color.asterAccentSoft, in: Circle())
+                VStack(alignment: .leading, spacing: 2) { Text(L(title)).font(.system(size: 13, weight: .medium)); Text(L(detail)).font(.system(size: 11.5)).foregroundStyle(muted) }
+                Spacer(minLength: 8)
+                Image(systemName: "arrow.up.left").font(.system(size: 10, weight: .semibold)).foregroundStyle(muted)
+            }.padding(.horizontal, 14).padding(.vertical, 12).contentShape(Rectangle())
+        }.buttonStyle(FluidButtonStyle())
+    }
+    /// Gold while Aster works on it, green when done, red when it needs the user.
+    private func statusColor(_ mission: Mission) -> Color {
+        if store.isRunning(mission.id) { return .asterPollen }
+        switch mission.status { case "Completada": return .green; case "Fallida", "Necesita revisión", "Por recuperar": return .red; default: return .asterMuted }
     }
     private var filteredMissions: [Mission] {
         store.state.missions.filter { (showArchived ? $0.archived == true : $0.archived != true) && (store.projectFilter == nil || $0.companyID == store.projectFilter) && (missionQuery.isEmpty || $0.title.localizedCaseInsensitiveContains(missionQuery) || $0.messages.contains { $0.text.localizedCaseInsensitiveContains(missionQuery) }) }.sorted { a, b in if (a.pinned ?? false) != (b.pinned ?? false) { return a.pinned == true }; return a.updated > b.updated }
@@ -280,8 +313,9 @@ struct MainView: View {
                             Button { store.openMission(mission.id); nearBottom = true } label: {
                                 VStack(alignment: .leading, spacing: 7) {
                                     HStack(spacing: 4) { if mission.pinned == true { Image(systemName: "pin.fill").font(.system(size: 8)) }; Text(mission.title).font(.system(size: 11, weight: .medium)).lineLimit(2).multilineTextAlignment(.leading) }
-                                    Text(L(mission.status)).font(.system(size: 9)).foregroundStyle(muted)
-                                }.frame(maxWidth: .infinity, alignment: .leading).padding(12).background(store.selectedMission == mission.id ? Color.primary.opacity(0.075) : Color.primary.opacity(0.025), in: RoundedRectangle(cornerRadius: 12))
+                                    HStack(spacing: 5) { Circle().fill(statusColor(mission)).frame(width: 6, height: 6); Text(L(mission.status)).font(.system(size: 10)).foregroundStyle(muted) }
+                                }.frame(maxWidth: .infinity, alignment: .leading).padding(12)
+                                    .background(store.selectedMission == mission.id ? Color.asterAccentSoft : Color.primary.opacity(0.03), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                             }.buttonStyle(.plain).contextMenu {
                                 Button(L("Renombrar")) { renamingMission = mission }
                                 Button(L(mission.pinned == true ? "Desfijar" : "Fijar")) { store.pinMission(mission.id) }
@@ -308,14 +342,15 @@ struct MainView: View {
                                 ForEach(mission.messages.filter { !$0.text.isEmpty }) { message in
                                     VStack(alignment: .leading, spacing: 8) {
                                         HStack {
-                                            Text(message.role == "user" ? L("TÚ") : (store.state.specialists.first { $0.id == mission.specialistID }?.title ?? "Aster").uppercased()).font(.system(size: 9, weight: .semibold)).tracking(1).foregroundStyle(muted)
+                                            if message.role != "user" { CompanionAvatar(style: store.state.specialists.first { $0.id == mission.specialistID }?.style ?? AvatarStyle(), mood: .calm, dimension: 18, animateAtRest: false, framesPerSecond: 12).accessibilityHidden(true) }
+                                            Text(message.role == "user" ? L("Tú") : (store.state.specialists.first { $0.id == mission.specialistID }?.title ?? "Aster")).font(.asterDisplay(12, weight: .semibold)).foregroundStyle(message.role == "user" ? Color.asterAccentText : Color.primary)
                                             Text(message.date.formatted(date: .omitted, time: .shortened)).font(.system(size: 9)).foregroundStyle(muted)
                                             Spacer()
                                             if message.role == "assistant" { Button { store.speak(message.text, agentID: mission.specialistID) } label: { Image(systemName: store.speaking ? "stop.circle" : "speaker.wave.2").font(.system(size: 10)) }.buttonStyle(.plain).accessibilityLabel(L("Leer en voz alta")) }
                                             Button { NSPasteboard.general.clearContents(); NSPasteboard.general.setString(message.text, forType: .string) } label: { Image(systemName: "doc.on.doc").font(.system(size: 10)) }.buttonStyle(.plain).accessibilityLabel(L("Copiar mensaje"))
                                         }
                                         RichMessage(text: AsterMarkup.display(message.text)).equatable()
-                                    }.padding(message.role == "user" ? 16 : 0).background(message.role == "user" ? Color.primary.opacity(0.045) : .clear, in: RoundedRectangle(cornerRadius: 16))
+                                    }.padding(message.role == "user" ? 16 : 0).background(message.role == "user" ? Color.asterAccentSoft.opacity(0.7) : .clear, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
                                 }
                                 if !store.isRunning(mission.id), let learned = mission.learned { LearnedNote(facts: learned) { store.forgetLearned($0, in: mission.id) } }
                                 if !store.isRunning(mission.id), let steps = mission.suggestions, !steps.isEmpty {
@@ -332,9 +367,9 @@ struct MainView: View {
                                             Button(L("Recuperar estado"), action: { store.recover() }).disabled(store.isRunning(mission.id) || !store.hasCapacity || mission.sessionID == nil)
                                             if error.contains("facturación") || error.contains("saldo") { let provider: AIProvider = store.settings.usesClaude ? .anthropic : .openai; Link(LF("Revisar cuenta de %@", provider.name), destination: provider.billingURL) }
                                         }.font(.system(size: 11))
-                                    }.padding(18).background(Color.orange.opacity(0.07), in: RoundedRectangle(cornerRadius: 12))
+                                    }.padding(18).background(Color.orange.opacity(0.08), in: RoundedRectangle(cornerRadius: 16, style: .continuous)).overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(Color.orange.opacity(0.25), lineWidth: 0.5))
                                 }
-                                if store.isRunning(mission.id) { HStack(spacing: 9) { ProgressView().controlSize(.small); Text(L(store.activity(for: mission.id))).font(.system(size: 11)).foregroundStyle(muted) } }
+                                if store.isRunning(mission.id) { HStack(spacing: 9) { ThinkingDots(); Text(L(store.activity(for: mission.id))).font(.system(size: 11.5, weight: .medium)).foregroundStyle(Color.asterPollen) } }
                                 ForEach(store.artifacts) { artifact in
                                     Button { store.downloadArtifact(artifact) } label: { Label(URL(fileURLWithPath: artifact.path).lastPathComponent, systemImage: "arrow.down.doc") }.glassControl().font(.system(size: 11))
                                 }
@@ -382,7 +417,7 @@ struct CustomizeView: View {
     var body: some View {
         VStack(spacing: 18) {
             HStack {
-                VStack(alignment: .leading, spacing: 5) { Text(L("Hazlo tuyo.")).font(.system(size: 27, weight: .semibold)).tracking(-0.7); Text(L("Pequeños detalles. Mucha personalidad.")).font(.system(size: 11)).foregroundStyle(muted) }
+                VStack(alignment: .leading, spacing: 5) { Text(L("Hazlo tuyo.")).font(.asterDisplay(27)).tracking(-0.7); Text(L("Pequeños detalles. Mucha personalidad.")).font(.system(size: 11)).foregroundStyle(muted) }
                 Spacer(); GlassIconButton(symbol: "xmark", title: "Cerrar personalización") { dismiss() }
             }
             VStack(spacing: 0) {

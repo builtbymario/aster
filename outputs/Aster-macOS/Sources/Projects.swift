@@ -78,19 +78,19 @@ struct ProjectsView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 22) {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text(L("Un espacio para cada cosa que te importa.")).font(.system(size: 28, weight: .semibold)).tracking(-0.8)
+                    Text(L("Un espacio para cada cosa que te importa.")).font(.asterDisplay(28)).tracking(-0.8)
                     Text(L("Cada proyecto tiene su propio chat, su equipo de agentes, sus tareas y su memoria. Elige por dónde empezar.")).font(.system(size: 13)).foregroundStyle(Color.asterMuted)
                 }
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 220), spacing: 12)], spacing: 12) {
                     ForEach(ProjectTemplate.all) { template in
                         Button { creating = template } label: {
                             VStack(alignment: .leading, spacing: 10) {
-                                Image(systemName: template.symbol).font(.system(size: 15, weight: .medium)).foregroundStyle(Color.asterAccent).frame(width: 34, height: 34).background(Color.asterAccentSoft, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                                Image(systemName: template.symbol).font(.system(size: 15, weight: .medium)).foregroundStyle(Color.asterAccent).frame(width: 34, height: 34).background(Color.asterAccentSoft, in: Circle())
                                 Text(L(template.name)).font(.system(size: 14, weight: .semibold))
                                 Text(L(template.detail)).font(.system(size: 11)).foregroundStyle(Color.asterMuted).fixedSize(horizontal: false, vertical: true).multilineTextAlignment(.leading)
                                 Spacer(minLength: 0)
                                 Text(template.modes.compactMap { id in store.state.specialists.first { $0.id == id }?.mode }.joined(separator: " · "))
-                                    .font(.asterMono(9)).foregroundStyle(Color.asterAccentText).lineLimit(2)
+                                    .font(.system(size: 10.5)).foregroundStyle(Color.asterMuted).lineLimit(2)
                             }.padding(16).frame(maxWidth: .infinity, minHeight: 170, alignment: .topLeading).frostedSurface(16).contentShape(Rectangle())
                         }.buttonStyle(FluidButtonStyle(lift: 1))
                     }
@@ -106,9 +106,9 @@ struct ProjectsView: View {
         return VStack(spacing: 0) {
             VStack(alignment: .leading, spacing: 12) {
                 HStack(alignment: .top, spacing: 14) {
-                    Image(systemName: project.template.symbol).font(.system(size: 16, weight: .medium)).foregroundStyle(Color.asterAccent).frame(width: 40, height: 40).background(Color.asterAccentSoft, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    Image(systemName: project.template.symbol).font(.system(size: 16, weight: .medium)).foregroundStyle(Color.asterAccent).frame(width: 40, height: 40).background(Color.asterAccentSoft, in: Circle())
                     VStack(alignment: .leading, spacing: 4) {
-                        Text(project.name).font(.system(size: 22, weight: .semibold)).tracking(-0.5).lineLimit(1)
+                        Text(project.name).font(.asterDisplay(22)).tracking(-0.5).lineLimit(1)
                         Text(project.goal).font(.system(size: 12)).foregroundStyle(Color.asterMuted).lineLimit(2).textSelection(.enabled)
                     }
                     Spacer()
@@ -252,7 +252,7 @@ struct ProjectForm: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
             HStack {
-                Text(L(editing ? "Editar proyecto" : "Nuevo proyecto")).font(.system(size: 22, weight: .semibold)).tracking(-0.5)
+                Text(L(editing ? "Editar proyecto" : "Nuevo proyecto")).font(.asterDisplay(22)).tracking(-0.5)
                 Spacer(); GlassIconButton(symbol: "xmark", title: "Cerrar") { dismiss() }
             }
             Picker(L("Tipo"), selection: Binding(get: { kind }, set: { value in

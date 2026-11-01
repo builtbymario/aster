@@ -14,7 +14,7 @@ struct TaskBoardView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-                HStack { VStack(alignment: .leading, spacing: 8) { Text(L("Ideas que avanzan.")).font(.system(size: 30, weight: .semibold)); Text(L("Próximos pasos para ti y para tus empresas.")).font(.system(size: 12)).foregroundStyle(.secondary) }; Spacer(); GlassAction(title: section == "Avisos" ? "Nuevo aviso" : "Nueva tarea", symbol: "plus", prominent: true) { if section == "Avisos" { addingAlert = true } else { adding = true } }.opacity(section == "Apple" ? 0 : 1).disabled(section == "Apple") }
+                HStack { VStack(alignment: .leading, spacing: 8) { Text(L("Ideas que avanzan.")).font(.asterDisplay(30)); Text(L("Próximos pasos para ti y para tus empresas.")).font(.system(size: 12)).foregroundStyle(.secondary) }; Spacer(); GlassAction(title: section == "Avisos" ? "Nuevo aviso" : "Nueva tarea", symbol: "plus", prominent: true) { if section == "Avisos" { addingAlert = true } else { adding = true } }.opacity(section == "Apple" ? 0 : 1).disabled(section == "Apple") }
                 Picker(L("Listas"), selection: $section) { Text("Aster").tag("Aster"); Text("Apple").tag("Apple"); Text(L("Avisos")).tag("Avisos") }.pickerStyle(.segmented).frame(maxWidth: 330)
                 if section == "Aster" {
                 HStack {
@@ -81,7 +81,7 @@ struct TaskForm: View {
     init(initialCompanyID: UUID?) { _companyID = State(initialValue: initialCompanyID) }
     var body: some View {
         VStack(alignment: .leading, spacing: 21) {
-            HStack { Text(L("Un siguiente paso.")).font(.system(size: 26, weight: .semibold)); Spacer(); GlassIconButton(symbol: "xmark", title: "Cerrar") { dismiss() } }
+            HStack { Text(L("Un siguiente paso.")).font(.asterDisplay(26)); Spacer(); GlassIconButton(symbol: "xmark", title: "Cerrar") { dismiss() } }
             TextField(L("¿Qué hay que hacer?"), text: $title, axis: .vertical).lineLimit(2...4).textFieldStyle(.roundedBorder)
             Picker(L("Proyecto"), selection: $companyID) { Text(L("Personal")).tag(nil as UUID?); ForEach(store.companies) { Text($0.name).tag(Optional($0.id)) } }
             Picker(L("Modo"), selection: $agentID) { ForEach(store.state.specialists) { Text($0.mode + " · " + L($0.role)).tag($0.id) } }
@@ -100,7 +100,7 @@ struct AlertForm: View {
     @State private var recurrence = "none"
     var body: some View {
         VStack(alignment: .leading, spacing: 22) {
-            HStack { Text(L("Te lo recordaré.")).font(.system(size: 26, weight: .semibold)); Spacer(); GlassIconButton(symbol: "xmark", title: "Cerrar") { dismiss() } }
+            HStack { Text(L("Te lo recordaré.")).font(.asterDisplay(26)); Spacer(); GlassIconButton(symbol: "xmark", title: "Cerrar") { dismiss() } }
             TextField(L("¿Qué quieres que te recuerde?"), text: $text, axis: .vertical).lineLimit(2...4).textFieldStyle(.roundedBorder)
             DatePicker(L("Cuándo"), selection: $date, in: Date()..., displayedComponents: [.date, .hourAndMinute])
             Picker(L("Repetir"), selection: $recurrence) { Text(L("Una vez")).tag("none"); Text(L("Cada día")).tag("daily"); Text(L("Cada semana")).tag("weekly") }
@@ -118,7 +118,7 @@ struct MemoryView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-                VStack(alignment: .leading, spacing: 8) { Text(L("Que te conozca mejor.")).font(.system(size: 30, weight: .semibold)); Text(L("Tus preferencias, tu contexto y las cosas que merece recordar.")).font(.system(size: 12)).foregroundStyle(.secondary) }
+                VStack(alignment: .leading, spacing: 8) { Text(L("Que te conozca mejor.")).font(.asterDisplay(30)); Text(L("Tus preferencias, tu contexto y las cosas que merece recordar.")).font(.system(size: 12)).foregroundStyle(.secondary) }
                 VStack(alignment: .leading, spacing: 13) {
                     Text(L("Añadir un recuerdo")).font(.system(size: 14, weight: .semibold))
                     TextEditor(text: $text).font(.system(size: 13)).scrollContentBackground(.hidden).frame(height: 85).padding(10).background(.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 12))
@@ -150,7 +150,7 @@ struct MemoryEditor: View {
     @State var entry: MemoryEntry
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
-            Text(L("Editar recuerdo")).font(.system(size: 24, weight: .semibold))
+            Text(L("Editar recuerdo")).font(.asterDisplay(24))
             TextEditor(text: $entry.text).font(.system(size: 13)).frame(height: 180).scrollContentBackground(.hidden).padding(12).frostedSurface(16)
             HStack { Button(L("Cancelar")) { dismiss() }; Spacer(); GlassAction(title: "Guardar", symbol: "checkmark", prominent: true) { store.updateMemory(entry); dismiss() }.disabled(entry.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) }
         }.padding(26).frame(width: 480).background(AmbientBackdrop(tint: Color.asterAccent))
@@ -165,7 +165,7 @@ struct RenameMissionView: View {
     init(mission: Mission) { self.mission = mission; _title = State(initialValue: mission.title) }
     var body: some View {
         VStack(alignment: .leading, spacing: 21) {
-            Text(L("Renombrar misión")).font(.system(size: 24, weight: .semibold))
+            Text(L("Renombrar misión")).font(.asterDisplay(24))
             TextField(L("Nombre"), text: $title).textFieldStyle(.roundedBorder)
             HStack { Button(L("Cancelar")) { dismiss() }; Spacer(); GlassAction(title: "Guardar", symbol: "checkmark", prominent: true) { store.renameMission(mission.id, title: title); dismiss() }.disabled(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) }
         }.padding(26).frame(width: 460).background(AmbientBackdrop(tint: Color.asterAccent))

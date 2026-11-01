@@ -104,7 +104,7 @@ struct OnboardingView: View {
         VStack(spacing: 26) {
             CompanionAvatar(style: style, mood: .happy, dimension: 104, framesPerSecond: 30).accessibilityHidden(true)
             VStack(spacing: 10) {
-                Text(L("Hola, soy Aster")).font(.system(size: 34, weight: .semibold)).tracking(-1)
+                Text(L("Hola, soy Aster")).font(.asterDisplay(34)).tracking(-1)
                 Text(L("Tu compañero de IA en el Mac. Vive en el notch, te escucha y hace el trabajo contigo.")).font(.system(size: 14)).foregroundStyle(.secondary).multilineTextAlignment(.center).lineSpacing(3)
             }
             VStack(alignment: .leading, spacing: 16) {
@@ -119,7 +119,7 @@ struct OnboardingView: View {
     private var brain: some View {
         VStack(alignment: .leading, spacing: 20) {
             VStack(alignment: .leading, spacing: 8) {
-                Text(L("¿Con qué IA piensa Aster?")).font(.system(size: 28, weight: .semibold)).tracking(-0.8)
+                Text(L("¿Con qué IA piensa Aster?")).font(.asterDisplay(28)).tracking(-0.8)
                 Text(L("Usa tu propia clave de API. Se guarda en el Llavero de este Mac y solo se envía a quien la emitió.")).font(.system(size: 13)).foregroundStyle(.secondary).lineSpacing(3)
             }
             HStack(spacing: 12) {
@@ -154,7 +154,7 @@ struct OnboardingView: View {
     private var you: some View {
         VStack(alignment: .leading, spacing: 20) {
             VStack(alignment: .leading, spacing: 8) {
-                Text(L("Un poco sobre ti")).font(.system(size: 28, weight: .semibold)).tracking(-0.8)
+                Text(L("Un poco sobre ti")).font(.asterDisplay(28)).tracking(-0.8)
                 Text(L("Aster lo usa para hablarte como prefieres. Lo puedes cambiar luego en Ajustes.")).font(.system(size: 13)).foregroundStyle(.secondary)
             }
             VStack(alignment: .leading, spacing: 16) {
@@ -178,7 +178,7 @@ struct OnboardingView: View {
         VStack(spacing: 24) {
             CompanionAvatar(style: style, mood: .speaking, dimension: 84, framesPerSecond: 30).accessibilityHidden(true)
             VStack(spacing: 8) {
-                Text(store.settings.userName.isEmpty ? L("Todo listo") : LF("Todo listo, %@", store.settings.userName)).font(.system(size: 30, weight: .semibold)).tracking(-0.8)
+                Text(store.settings.userName.isEmpty ? L("Todo listo") : LF("Todo listo, %@", store.settings.userName)).font(.asterDisplay(30)).tracking(-0.8)
                 Text(L(connected ? "Pregúntale lo que quieras. Así se llega a Aster:" : "Conecta tu IA en Ajustes → Conexiones cuando quieras. Así se llega a Aster:")).font(.system(size: 13)).foregroundStyle(.secondary).multilineTextAlignment(.center)
             }
             VStack(alignment: .leading, spacing: 14) {
@@ -202,7 +202,7 @@ struct OnboardingView: View {
 
     private func feature(_ symbol: String, _ title: String, _ detail: String) -> some View {
         HStack(alignment: .top, spacing: 14) {
-            Image(systemName: symbol).font(.system(size: 14, weight: .medium)).foregroundStyle(Color.asterAccent).frame(width: 30, height: 30).background(Color.asterAccentSoft, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+            Image(systemName: symbol).font(.system(size: 14, weight: .medium)).foregroundStyle(Color.asterAccent).frame(width: 30, height: 30).background(Color.asterAccentSoft, in: Circle())
             VStack(alignment: .leading, spacing: 3) {
                 Text(L(title)).font(.system(size: 13, weight: .semibold))
                 Text(L(detail)).font(.system(size: 12)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)

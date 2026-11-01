@@ -16,7 +16,7 @@ struct SettingsView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text(L("Aster, a tu manera.")).font(.system(size: 30, weight: .semibold)).tracking(-0.8)
+                    Text(L("Aster, a tu manera.")).font(.asterDisplay(30)).tracking(-0.8)
                     Text(L("Lo esencial está en General; el resto, cuando lo necesites.")).font(.system(size: 12)).foregroundStyle(.secondary)
                 }
                 Picker(L("Ajustes"), selection: $tab) { ForEach(tabs, id: \.self) { Text(L($0)).tag($0) } }.pickerStyle(.segmented).labelsHidden().frame(maxWidth: 460)
@@ -148,7 +148,7 @@ struct SettingsView: View {
                 Picker(L("Tipo de voz"), selection: Binding(get: { store.state.preferences.voiceEngine ?? "natural" }, set: { store.voice.stop(); store.state.preferences.voiceEngine = $0; store.save() })) { Text(L("Natural · OpenAI")).tag("natural"); Text(L("Voces de macOS")).tag("system") }
                 Text(L(store.settings.usesClaude && !AIProvider.openai.hasKey ? "Las voces naturales son de OpenAI y necesitan su clave. Mientras uses solo Claude, Aster habla con las voces de macOS." : "Las voces naturales son generadas por IA. Leen en el idioma del texto y usan tu saldo de OpenAI. Las voces de macOS funcionan sin esa conexión.")).font(.system(size: 11)).foregroundStyle(.secondary).lineSpacing(4)
                 ForEach(store.state.specialists) { agent in
-                    HStack { Image(systemName: agent.symbol).font(.system(size: 10)).foregroundStyle(Color.asterAccent).frame(width: 14); Text(agent.mode).font(.asterMono(11, weight: .medium)).frame(width: 65, alignment: .leading); Picker(L("Voz"), selection: Binding(get: { store.state.preferences.agentVoices?[agent.id] ?? AsterVoice.defaultID(agent.id) }, set: { store.state.preferences.agentVoices = (store.state.preferences.agentVoices ?? [:]).merging([agent.id: $0]) { _, new in new }; store.save() })) { ForEach(AsterVoice.all) { Text(L($0.label)).tag($0.id) } }.labelsHidden().disabled(store.state.preferences.voiceEngine == "system"); Button(L("Escuchar")) { store.select(agent.id); store.speak(L("Hola. Estoy aquí para pensar contigo, ayudarte a crear y acompañarte en lo que necesites.")) } }.font(.system(size: 11))
+                    HStack { Image(systemName: agent.symbol).font(.system(size: 10)).foregroundStyle(Color.asterAccent).frame(width: 14); Text(agent.mode).font(.asterDisplay(12, weight: .medium)).frame(width: 65, alignment: .leading); Picker(L("Voz"), selection: Binding(get: { store.state.preferences.agentVoices?[agent.id] ?? AsterVoice.defaultID(agent.id) }, set: { store.state.preferences.agentVoices = (store.state.preferences.agentVoices ?? [:]).merging([agent.id: $0]) { _, new in new }; store.save() })) { ForEach(AsterVoice.all) { Text(L($0.label)).tag($0.id) } }.labelsHidden().disabled(store.state.preferences.voiceEngine == "system"); Button(L("Escuchar")) { store.select(agent.id); store.speak(L("Hola. Estoy aquí para pensar contigo, ayudarte a crear y acompañarte en lo que necesites.")) } }.font(.system(size: 11))
                 }
                 if store.speaking { Button(L("Detener voz")) { store.voice.stop() } }
             }
@@ -199,7 +199,7 @@ struct SettingsView: View {
     }
     private func card<Content: View>(_ title: String, icon: String, @ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 15) {
-            Label(L(title), systemImage: icon).font(.system(size: 15, weight: .semibold))
+            Label(L(title), systemImage: icon).font(.asterDisplay(15))
             content().font(.system(size: 12))
         }.padding(22).frame(maxWidth: .infinity, alignment: .leading).frostedSurface(23)
     }
