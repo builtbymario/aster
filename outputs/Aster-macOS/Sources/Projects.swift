@@ -12,13 +12,12 @@ struct ProjectsView: View {
     private var project: Company? { store.companies.first { $0.id == store.selectedProject } ?? store.companies.first }
 
     var body: some View {
-        HStack(spacing: 0) {
+        HStack(spacing: 12) {
             if let project {
-                list
-                Rectangle().fill(Color.asterHairline).frame(width: 1)
-                detail(project).id(project.id)
+                list.frostedSurface(22)
+                detail(project).id(project.id).frostedSurface(22).transition(.opacity)
             } else { start }
-        }
+        }.padding(.horizontal, 6).padding(.bottom, 8)
         .sheet(item: $creating) { template in
             ProjectForm(template: template) { name, goal, notes, kind, modes in
                 if let created = store.createProject(name: name, goal: goal, notes: notes, kind: kind, modes: modes) { store.selectedProject = created.id; composing = true }
@@ -55,7 +54,7 @@ struct ProjectsView: View {
                                 Spacer(minLength: 0)
                                 if store.isRunning(store.projectChat(item.id)?.id) { ThinkingDots().scaleEffect(0.7) }
                             }.padding(.horizontal, 10).padding(.vertical, 8).frame(maxWidth: .infinity, alignment: .leading)
-                                .background(selected ? Color.asterAccentSoft : .clear, in: RoundedRectangle(cornerRadius: 9, style: .continuous)).contentShape(Rectangle())
+                                .background(selected ? Color.asterAccentSoft : .clear, in: RoundedRectangle(cornerRadius: 11, style: .continuous)).hoverFill(11, active: selected).contentShape(Rectangle())
                         }.buttonStyle(.plain).contextMenu {
                             Button(L("Editar proyecto")) { editing = item }
                             Button(L("Archivar proyecto")) { store.archiveCompany(item.id) }
@@ -91,12 +90,12 @@ struct ProjectsView: View {
                                 Spacer(minLength: 0)
                                 Text(template.modes.compactMap { id in store.state.specialists.first { $0.id == id }?.mode }.joined(separator: " · "))
                                     .font(.system(size: 10.5)).foregroundStyle(Color.asterMuted).lineLimit(2)
-                            }.padding(16).frame(maxWidth: .infinity, minHeight: 170, alignment: .topLeading).frostedSurface(16).contentShape(Rectangle())
-                        }.buttonStyle(FluidButtonStyle(lift: 1))
+                            }.padding(16).frame(maxWidth: .infinity, minHeight: 170, alignment: .topLeading).frostedSurface(18).contentShape(Rectangle())
+                        }.buttonStyle(FluidButtonStyle(lift: 2))
                     }
                 }
-            }.padding(30)
-        }
+            }.padding(.horizontal, 16).padding(.vertical, 12).frame(maxWidth: 900, alignment: .leading).frame(maxWidth: .infinity)
+        }.scrollIndicators(.hidden)
     }
 
     private func detail(_ project: Company) -> some View {
@@ -132,8 +131,10 @@ struct ProjectsView: View {
                         if messages.isEmpty && !working { welcome(project) }
                         ForEach(messages) { message in
                             if message.role == "user" {
-                                Text(message.text).font(.system(size: 13)).textSelection(.enabled).padding(.horizontal, 14).padding(.vertical, 10)
-                                    .background(Color.asterRaised, in: RoundedRectangle(cornerRadius: 14, style: .continuous)).frame(maxWidth: .infinity, alignment: .trailing)
+                                Text(message.text).font(.system(size: 13)).lineSpacing(4).textSelection(.enabled).padding(.horizontal, 14).padding(.vertical, 10)
+                                    .background(Color.asterAccentSoft, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                                    .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(Color.asterAccent.opacity(0.14), lineWidth: 1))
+                                    .padding(.leading, 60).frame(maxWidth: .infinity, alignment: .trailing)
                             } else {
                                 VStack(alignment: .leading, spacing: 6) {
                                     MonoLabel(modeLabel(chat, message: message), color: Color.asterAccentText, size: 9)
@@ -171,7 +172,7 @@ struct ProjectsView: View {
                                 .background(action.kickoff ? Color.asterAccent : Color.asterAccentSoft, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
                             Text(L(action.title)).font(.system(size: 12, weight: .medium))
                             Spacer(minLength: 0)
-                        }.padding(10).frame(maxWidth: .infinity).frostedSurface(12).contentShape(Rectangle())
+                        }.padding(10).frame(maxWidth: .infinity).background(Color.asterWell, in: RoundedRectangle(cornerRadius: 13, style: .continuous)).overlay(RoundedRectangle(cornerRadius: 13, style: .continuous).strokeBorder(Color.asterHairline, lineWidth: 1)).contentShape(Rectangle())
                     }.buttonStyle(FluidButtonStyle(lift: 1)).disabled(!store.hasCapacity)
                 }
             }
@@ -186,12 +187,16 @@ struct ProjectsView: View {
             DictationButton(listener: store.listener) { dictate(project) }
             Button { if working { store.stop(missionID: chat?.id) } else { send(project) } } label: {
                 Image(systemName: working ? "stop.fill" : "arrow.up").font(.system(size: 12, weight: .semibold)).frame(width: 30, height: 30)
-                    .foregroundStyle(Color.asterOnAccent).background(Color.asterAccent, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    .foregroundStyle(Color.asterOnAccent).background(Color.asterAccent, in: Circle())
+                    .overlay(Circle().fill(LinearGradient(colors: [.white.opacity(0.22), .clear], startPoint: .top, endPoint: .center)))
+                    .contentTransition(.symbolEffect(.replace))
             }.buttonStyle(FluidButtonStyle()).disabled(!working && (empty || !store.hasCapacity)).accessibilityLabel(L(working ? "Detener" : "Enviar"))
         }
-        .padding(.horizontal, 14).padding(.vertical, 10).frostedSurface(16)
-        .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(composing ? Color.asterAccent.opacity(0.6) : .clear, lineWidth: 1))
-        .padding(.horizontal, 22).padding(.vertical, 14)
+        .padding(.leading, 16).padding(.trailing, 8).padding(.vertical, 7)
+        .glassChrome(RoundedRectangle(cornerRadius: 22, style: .continuous), shadow: false)
+        .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous).strokeBorder(composing ? Color.asterAccent.opacity(0.55) : .clear, lineWidth: 1))
+        .animation(AsterMotion.quick(reduceMotion), value: composing)
+        .padding(.horizontal, 16).padding(.vertical, 12)
     }
 
     private func send(_ project: Company) {
@@ -261,9 +266,9 @@ struct ProjectForm: View {
                 kind = value
             })) { ForEach(ProjectTemplate.all) { Label(L($0.name), systemImage: $0.symbol).tag($0.id) } }
             VStack(alignment: .leading, spacing: 8) {
-                field("Nombre") { TextField(L(template.id == "study" ? "Ingeniería Industrial" : "Ponle un nombre"), text: $name).textFieldStyle(.roundedBorder) }
-                field("¿Qué quieres conseguir?") { TextField(L(template.goalHint), text: $goal, axis: .vertical).lineLimit(2...4).textFieldStyle(.roundedBorder) }
-                field("Contexto (opcional)") { TextField(L("Lo que Aster debería saber: audiencia, recursos, fechas, nivel…"), text: $notes, axis: .vertical).lineLimit(2...4).textFieldStyle(.roundedBorder) }
+                field("Nombre") { TextField(L(template.id == "study" ? "Ingeniería Industrial" : "Ponle un nombre"), text: $name).textFieldStyle(.aster) }
+                field("¿Qué quieres conseguir?") { TextField(L(template.goalHint), text: $goal, axis: .vertical).lineLimit(2...4).textFieldStyle(.aster) }
+                field("Contexto (opcional)") { TextField(L("Lo que Aster debería saber: audiencia, recursos, fechas, nivel…"), text: $notes, axis: .vertical).lineLimit(2...4).textFieldStyle(.aster) }
             }
             VStack(alignment: .leading, spacing: 8) {
                 Text(L("Equipo")).font(.system(size: 12, weight: .medium))
@@ -277,7 +282,7 @@ struct ProjectForm: View {
                                     Image(systemName: on ? "checkmark.circle.fill" : mode.symbol).font(.system(size: 10)).foregroundStyle(on ? Color.asterAccent : Color.asterMuted)
                                     Text(mode.mode).font(.system(size: 11, weight: .medium)); Spacer(minLength: 0)
                                 }.padding(.horizontal, 9).padding(.vertical, 7)
-                                    .background(on ? Color.asterAccentSoft : Color.asterSurface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                                    .background(on ? Color.asterAccentSoft : Color.asterWell, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
                                     .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(on ? Color.asterAccent.opacity(0.5) : Color.asterHairline, lineWidth: 0.5))
                             }.buttonStyle(.plain).accessibilityAddTraits(on ? .isSelected : [])
                         }
@@ -290,7 +295,7 @@ struct ProjectForm: View {
                 Button(L(editing ? "Guardar" : "Crear proyecto")) { save(name, goal, notes, kind, Specialist.modeOrder.filter(modes.contains)); dismiss() }
                     .buttonStyle(AsterButtonStyle(prominent: true, large: true)).disabled(!ready).keyboardShortcut(.defaultAction)
             }
-        }.font(.system(size: 12)).padding(24).frame(width: 500).background(Color.asterCanvas)
+        }.font(.system(size: 12)).padding(24).frame(width: 500).background(AmbientBackdrop(tint: Color.asterAccent, vibrant: false))
     }
     private func field<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 5) { Text(L(title)).font(.system(size: 12, weight: .medium)); content() }

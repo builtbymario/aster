@@ -78,9 +78,11 @@ struct OnboardingView: View {
     var body: some View {
         ZStack {
             Color.asterCanvas.ignoresSafeArea()
+            AmbientBackdrop(tint: Color.asterAccent, vibrant: false)
             VStack(spacing: 0) {
-                HStack(spacing: 6) { ForEach(0..<4) { index in Capsule().fill(index <= step ? Color.asterAccent : Color.asterHairlineStrong).frame(width: index == step ? 22 : 6, height: 6) } }
-                    .padding(.top, 34).accessibilityHidden(true)
+                HStack(spacing: 6) { ForEach(0..<4) { index in Capsule().fill(index <= step ? Color.asterAccent : Color.asterHairlineStrong).frame(width: index == step ? 26 : 6, height: 6) } }
+                    .animation(AsterMotion.spring(reduceMotion), value: step)
+                    .padding(.top, 44).accessibilityHidden(true)
                 Spacer(minLength: 20)
                 Group {
                     switch step {
@@ -128,7 +130,7 @@ struct OnboardingView: View {
             }
             VStack(alignment: .leading, spacing: 10) {
                 HStack {
-                    SecureField(LF("Clave de API de %@", provider.name), text: $key).textFieldStyle(.roundedBorder).onSubmit(connect).disabled(checking)
+                    SecureField(LF("Clave de API de %@", provider.name), text: $key).textFieldStyle(.aster).onSubmit(connect).disabled(checking)
                     Button(L(checking ? "Comprobando…" : connected ? "Conectada" : "Conectar"), action: connect).buttonStyle(AsterButtonStyle(prominent: !connected))
                         .disabled(checking || key.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
@@ -159,7 +161,7 @@ struct OnboardingView: View {
             }
             VStack(alignment: .leading, spacing: 16) {
                 TextField(L("Cómo quieres que te llame"), text: Binding(get: { store.settings.userName }, set: { value in var updated = store.settings; updated.userName = String(value.prefix(80)); store.settings = updated }))
-                    .textFieldStyle(.roundedBorder)
+                    .textFieldStyle(.aster)
                 Picker(L("Idioma de la interfaz"), selection: $language) { ForEach(AsterLanguage.allCases, id: \.rawValue) { Text($0.name).tag($0.rawValue) } }.pickerStyle(.segmented)
                 VStack(alignment: .leading, spacing: 8) {
                     Picker(L("Aster en tu Mac"), selection: Binding(get: { store.state.preferences.desktopStyle ?? "island" }, set: { store.applyDesktopStyle?($0) })) {

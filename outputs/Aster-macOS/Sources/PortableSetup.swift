@@ -32,14 +32,18 @@ struct AIConnectionView: View {
     private var provider: AIProvider { store.settings.usesClaude ? .anthropic : .openai }
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack { Label(L("Tu IA"), systemImage: "sparkle").font(.headline); Spacer(); Text(L(store.connectionStatus)).font(.caption).foregroundStyle(.secondary).lineLimit(2) }
-            Picker(L("Proveedor"), selection: Binding(get: { provider }, set: { store.choose($0); message = ""; key = "" })) {
-                ForEach([AIProvider.anthropic, .openai], id: \.self) { Text($0.name).tag($0) }
-            }.pickerStyle(.segmented).labelsHidden().frame(maxWidth: 260)
+            HStack(spacing: 10) {
+                Image(systemName: "sparkle").font(.system(size: 12, weight: .semibold)).foregroundStyle(Color.asterAccent).frame(width: 28, height: 28).background(Color.asterAccentSoft, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+                Text(L("Tu IA")).font(.asterDisplay(15))
+                Spacer()
+                Circle().fill(store.connectionReady ? Color.green : Color.orange).frame(width: 6, height: 6)
+                Text(L(store.connectionStatus)).font(.caption).foregroundStyle(.secondary).lineLimit(2)
+            }
+            GlassSegmented(options: [(AIProvider.anthropic, AIProvider.anthropic.name), (AIProvider.openai, AIProvider.openai.name)], selection: Binding(get: { provider }, set: { store.choose($0); message = ""; key = "" })).frame(maxWidth: 260)
             Text(LF("Aster piensa con tu propia cuenta de %@. La clave queda en el Llavero de este Mac y solo se envía a %@.", provider.name, provider == .anthropic ? "Anthropic" : "OpenAI")).font(.caption).foregroundStyle(.secondary)
             HStack {
-                SecureField(provider.hasKey ? L("Sustituir la clave guardada") : LF("Clave de API de %@", provider.name), text: $key).textFieldStyle(.roundedBorder)
-                Button(L(saving ? "Comprobando…" : "Conectar")) { connect(key) }.disabled(saving || key.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                SecureField(provider.hasKey ? L("Sustituir la clave guardada") : LF("Clave de API de %@", provider.name), text: $key).textFieldStyle(.aster).onSubmit { connect(key) }
+                Button(L(saving ? "Comprobando…" : "Conectar")) { connect(key) }.glassControl(prominent: true).disabled(saving || key.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }
             if store.connectionReady || !store.availableModels.isEmpty { ModelPicker() }
             HStack {
@@ -47,9 +51,9 @@ struct AIConnectionView: View {
                     Button(L("Importar mi configuración")) {
                         let panel = NSOpenPanel(); panel.canChooseDirectories = false; panel.showsHiddenFiles = true; panel.message = L("Selecciona tu archivo de configuración de OpenAI. Solo se importa la clave al Llavero.")
                         if panel.runModal() == .OK, let url = panel.url { do { connect(try AgentAPI.keyFromFile(url.path)) } catch { message = error.localizedDescription } }
-                    }.disabled(saving)
+                    }.glassControl().disabled(saving)
                 }
-                Button(L("Comprobar conexión"), action: store.refreshConnection).disabled(store.checkingConnection || saving || !provider.hasKey)
+                Button(L("Comprobar conexión"), action: store.refreshConnection).glassControl().disabled(store.checkingConnection || saving || !provider.hasKey)
                 Spacer(); Link(L("Obtener mi clave"), destination: provider.keysURL)
             }.font(.caption)
             if !message.isEmpty { Text(L(message)).font(.caption).textSelection(.enabled) }
@@ -57,7 +61,7 @@ struct AIConnectionView: View {
                    ? "Con Claude, el chat, las misiones, el control del Mac y las explicaciones de pantalla usan tu saldo de Anthropic. Las voces naturales son de OpenAI; sin esa clave, Aster habla con las voces de macOS."
                    : "Las respuestas, las misiones y la voz natural usan el saldo de tu cuenta de OpenAI.")).font(.caption2).foregroundStyle(.secondary)
             Text(L("Cada Mac utiliza su propia clave. No se incluye en el instalador ni se envía al iPhone.")).font(.caption2).foregroundStyle(.secondary)
-        }.padding(22).frostedSurface(20)
+        }.padding(20).frostedSurface(20)
     }
     private func connect(_ candidate: String) {
         guard !saving else { return }; saving = true; message = ""
@@ -95,17 +99,19 @@ struct RemoteSettingsView: View {
     }
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            HStack { Label("Tu Mac, desde tu iPhone", systemImage: "iphone.and.arrow.forward").font(.headline); Spacer(); Circle().fill(remote.connection.peerOnline ? Color.green : Color.secondary.opacity(0.4)).frame(width: 7, height: 7); Text(remote.connection.status).font(.caption).foregroundStyle(.secondary) }
+            HStack(spacing: 10) {
+                Image(systemName: "iphone.and.arrow.forward").font(.system(size: 12, weight: .semibold)).foregroundStyle(Color.asterAccent).frame(width: 28, height: 28).background(Color.asterAccentSoft, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+                Text("Tu Mac, desde tu iPhone").font(.asterDisplay(15)); Spacer(); Circle().fill(remote.connection.peerOnline ? Color.green : Color.secondary.opacity(0.4)).frame(width: 7, height: 7); Text(remote.connection.status).font(.caption).foregroundStyle(.secondary) }
             Text("Habla con tus agentes, sigue sus tareas y abre la pantalla del Mac estés donde estés. El Mac necesita Internet, Aster abierto y la sesión iniciada.").font(.caption).foregroundStyle(.secondary)
             if remote.pairing == nil {
-                TextField("Servidor de enlace · wss://…", text: $relay).textFieldStyle(.roundedBorder)
-                HStack { Button("Crear enlace privado") { remote.createPairing(relay: relay); reveal = remote.pairing != nil }.disabled(relay.isEmpty); Text("La dirección la proporciona quien despliega Aster Relay.").font(.caption2).foregroundStyle(.secondary) }
+                TextField("Servidor de enlace · wss://…", text: $relay).textFieldStyle(.aster)
+                HStack { Button("Crear enlace privado") { remote.createPairing(relay: relay); reveal = remote.pairing != nil }.glassControl(prominent: true).disabled(relay.isEmpty); Text("La dirección la proporciona quien despliega Aster Relay.").font(.caption2).foregroundStyle(.secondary) }
             } else {
                 Toggle("Disponible para mi iPhone", isOn: Binding(get: { remote.enabled }, set: { $0 ? remote.start() : remote.stop() })).toggleStyle(.switch)
                 Toggle("Permitir controlar este Mac", isOn: $remote.allowControl).toggleStyle(.switch)
                 Text("Permite que tu iPhone inicie tareas en pantalla y use el control manual. Puedes desactivarlo aquí en cualquier momento.").font(.caption2).foregroundStyle(.secondary)
                 if remote.sharing { Label("Tu iPhone está viendo esta pantalla", systemImage: "rectangle.inset.filled.and.person.filled").font(.caption).foregroundStyle(.green) }
-                HStack { Button(reveal ? "Ocultar código" : "Enlazar mi iPhone") { withAnimation(.easeInOut(duration: 0.2)) { reveal.toggle() } }; Button("Desvincular iPhone", role: .destructive) { confirmRevoke = true } }
+                HStack { Button(reveal ? "Ocultar código" : "Enlazar mi iPhone") { withAnimation(.easeInOut(duration: 0.2)) { reveal.toggle() } }.glassControl(); Button("Desvincular iPhone", role: .destructive) { confirmRevoke = true }.glassControl() }
                 if reveal, let qr {
                     HStack(alignment: .center, spacing: 20) {
                         Image(nsImage: qr).interpolation(.none).resizable().scaledToFit().frame(width: 205, height: 205).padding(12).background(.white, in: RoundedRectangle(cornerRadius: 16))
@@ -125,10 +131,10 @@ struct RemoteSettingsView: View {
                     catch { loginMessage = error.localizedDescription }
                 }
                 Button("Ajustes de inicio") { SMAppService.openSystemSettingsLoginItems() }
-            }.font(.caption)
+            }.glassControl()
             if !loginMessage.isEmpty { Text(loginMessage).font(.caption2).foregroundStyle(.secondary) }
             Text("Mientras el acceso remoto está activo, Aster evita el reposo por inactividad. Cerrar la tapa, apagar el Mac o perder Internet interrumpe la conexión. Bloquearlo detiene la pantalla y el control.").font(.caption2).foregroundStyle(.secondary)
-        }.padding(22).frostedSurface(20)
+        }.padding(20).frostedSurface(20)
         .confirmationDialog("¿Desvincular el iPhone? Tendrás que escanear un código nuevo para volver a conectarlo.", isPresented: $confirmRevoke) { Button("Desvincular", role: .destructive) { remote.revoke(); reveal = false } }
     }
 }

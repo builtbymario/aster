@@ -314,6 +314,6 @@ private struct CoachDrawingToolbar: View {
         HStack(spacing: 16) {
             ForEach([("line", "pencil.tip"), ("arrow", "arrow.up.right"), ("circle", "circle"), ("rectangle", "rectangle")], id: \.0) { kind, symbol in Button { coach.chooseTool(kind) } label: { Image(systemName: symbol).frame(width: 22, height: 24).background(coach.drawingTool == kind ? Color.primary.opacity(0.15) : Color.clear, in: RoundedRectangle(cornerRadius: 5)) }.help(L(kind)) }
             Divider().frame(height: 20); Button { coach.undoStroke() } label: { Image(systemName: "arrow.uturn.backward") }.help(L("Deshacer")); Button(L("Listo · Esc")) { coach.finishDrawing() }
-        }.buttonStyle(.plain).font(.system(size: 12, weight: .medium)).padding(14).frame(width: 390, height: 54).background(.regularMaterial, in: Capsule()).overlay(Capsule().stroke(.primary.opacity(0.13)))
+        }.buttonStyle(.plain).font(.system(size: 12, weight: .medium)).padding(14).frame(width: 390, height: 54).glassChrome(Capsule(style: .continuous), shadow: false)
     }
 }

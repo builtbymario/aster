@@ -40,8 +40,8 @@ final class DesignSnapshotTests: XCTestCase {
             }
             VStack(alignment: .leading, spacing: 6) {
                 MonoLabel("Builder · pensando")
-                Text("Una tarjeta con línea fina").font(.system(size: 13, weight: .medium))
-                Text("Superficie sólida, sin sombra, con el acento lavanda reservado a lo importante.").font(.system(size: 12)).foregroundStyle(Color.asterMuted)
+                Text("Una tarjeta de vidrio").font(.system(size: 13, weight: .medium))
+                Text("Cuerpo translúcido, borde luminoso y una sombra suave; el acento, solo para lo importante.").font(.system(size: 12)).foregroundStyle(Color.asterMuted)
             }.padding(14).frame(width: 360, alignment: .leading).frostedSurface()
         }.padding(24)
         for dark in [false, true] { try Self.render(sample, named: "controls", dark: dark) }

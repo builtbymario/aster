@@ -12,16 +12,11 @@ struct ComputerWorkspaceView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
-                HStack(alignment: .top) {
-                    VStack(alignment: .leading, spacing: 7) {
-                        Text(L("Una mano en tu Mac.")).font(.asterDisplay(30)).tracking(-0.8)
-                        Text(L("Estudia, crea y trabaja con tus apps. Mira cada paso.")).font(.system(size: 12)).foregroundStyle(.secondary)
-                    }
-                    Spacer()
+                PageHeader(title: "Una mano en tu Mac.", subtitle: "Estudia, crea y trabaja con tus apps. Mira cada paso.") {
                     if computer.active { GlassAction(title: "Detener", symbol: "stop.fill", action: { computer.stop() }) }
                 }
                 HStack(spacing: 16) {
-                    Image(systemName: "cursorarrow.rays").font(.system(size: 25))
+                    Image(systemName: "cursorarrow.rays").font(.system(size: 17, weight: .medium)).foregroundStyle(Color.asterAccent).frame(width: 44, height: 44).background(Color.asterAccentSoft, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                     VStack(alignment: .leading, spacing: 5) { Text(L("A tu lado")).font(.system(size: 15, weight: .semibold)); Text(L("Un compañero junto al cursor. Explicaciones, dibujos y tareas sobre tu pantalla.")).font(.system(size: 11)).foregroundStyle(.secondary); Text("⌥⌘K").font(.system(size: 10, design: .monospaced)).foregroundStyle(.secondary) }
                     Spacer(); GlassAction(title: "Abrir A tu lado", symbol: "sparkles") { store.onOpenCoach?() }.disabled(computer.active)
                 }.padding(20).frostedSurface(21)
@@ -54,7 +49,7 @@ struct ComputerWorkspaceView: View {
                 if !computer.question.isEmpty {
                     VStack(alignment: .leading, spacing: 13) {
                         Text(computer.question).font(.system(size: 13, weight: .medium)).textSelection(.enabled)
-                        TextField(L("Tu respuesta o indicación…"), text: $answer, axis: .vertical).textFieldStyle(.roundedBorder).lineLimit(1...5)
+                        TextField(L("Tu respuesta o indicación…"), text: $answer, axis: .vertical).textFieldStyle(.aster).lineLimit(1...5)
                         HStack { Text(L("Puedes realizar tú el paso pendiente y después continuar.")).font(.system(size: 10)).foregroundStyle(.secondary); Spacer(); GlassAction(title: "Continuar con mi respuesta", symbol: "arrow.right") { computer.resume(answer); answer = "" }.disabled(answer.isEmpty) }
                     }.padding(20).frostedSurface(21)
                 }
@@ -62,7 +57,7 @@ struct ComputerWorkspaceView: View {
                 if !computer.steps.isEmpty {
                     VStack(alignment: .leading, spacing: 12) {
                         Text(L("Lo que está haciendo")).font(.system(size: 13, weight: .semibold))
-                        ForEach(Array(computer.steps.suffix(12))) { step in HStack(alignment: .top, spacing: 10) { Image(systemName: step.action == "error" ? "exclamationmark.circle" : step.action == "finish" ? "checkmark.circle" : "circle.fill").font(.system(size: step.action == "error" || step.action == "finish" ? 12 : 5)).frame(width: 15, height: 17).foregroundStyle(.secondary); Text(step.text).font(.system(size: 12)).lineSpacing(4).textSelection(.enabled); Spacer(); Text(step.date.formatted(date: .omitted, time: .shortened)).font(.system(size: 9)).foregroundStyle(.tertiary) } }
+                        ForEach(Array(computer.steps.suffix(12))) { step in HStack(alignment: .top, spacing: 10) { Image(systemName: step.action == "error" ? "exclamationmark.circle" : step.action == "finish" ? "checkmark.circle" : "circle.fill").font(.system(size: step.action == "error" || step.action == "finish" ? 12 : 5)).frame(width: 15, height: 17).foregroundStyle(.secondary); Text(step.text).font(.system(size: 12)).lineSpacing(4).textSelection(.enabled); Spacer(); Text(AsterDate.stamp(step.date, date: .omitted, time: .shortened)).font(.system(size: 9)).foregroundStyle(.tertiary) } }
                         if !computer.result.isEmpty { Divider(); RichMessage(text: computer.result) }
                     }.padding(20).frostedSurface(21)
                 }
@@ -74,7 +69,7 @@ struct ComputerWorkspaceView: View {
                         } label: { HStack { Text(run.task).font(.system(size: 12, weight: .medium)).lineLimit(1); Spacer(); Text(L(run.status)).font(.system(size: 10)).foregroundStyle(.secondary) } }.padding(17).frostedSurface(19)
                     }
                 }
-            }.padding(.horizontal, 22).padding(.top, 10).padding(.bottom, 26)
+            }.padding(.horizontal, 16).padding(.top, 6).padding(.bottom, 26).frame(maxWidth: 900, alignment: .leading).frame(maxWidth: .infinity)
         }.scrollIndicators(.hidden).onAppear { computer.refreshPermissions() }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in computer.refreshPermissions() }
         .onReceive(permissionRefresh) { _ in if !computer.active { computer.refreshPermissions() } }
@@ -82,14 +77,14 @@ struct ComputerWorkspaceView: View {
     private var taskComposer: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack { Text(L("¿Qué hacemos juntos?")).font(.system(size: 15, weight: .semibold)); Spacer(); Picker(L("Modo"), selection: $agentID) { ForEach(store.state.specialists) { Text($0.mode).tag($0.id) } }.frame(width: 150) }
-            TextEditor(text: $task).font(.system(size: 14)).scrollContentBackground(.hidden).frame(height: 70).padding(10).background(.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 12)).accessibilityLabel(L("Tarea para el ordenador"))
+            TextEditor(text: $task).font(.system(size: 14)).scrollContentBackground(.hidden).frame(height: 70).padding(10).background(Color.asterWell, in: RoundedRectangle(cornerRadius: 12, style: .continuous)).overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Color.asterHairline, lineWidth: 1)).accessibilityLabel(L("Tarea para el ordenador"))
             HStack(spacing: 8) {
                 Button(L("Una hoja de Excel")) { task = L("Abre Excel y crea una hoja nueva con una tabla de presupuesto mensual. Añade ingresos, gastos, totales y fórmulas. Explícame cada paso y comprueba los resultados.") }
                 Button(L("Estudiar conmigo")) { task = L("Ayúdame con la tarea que tengo abierta. Lee las instrucciones, explícame cómo resolverla y prepara el trabajo en la app, paso a paso.") }
                 Spacer()
             }.font(.system(size: 10)).glassControl()
             HStack {
-                VStack(alignment: .leading, spacing: 4) { Text(L("Aster verá la pantalla y usará el cursor durante esta tarea.")).font(.system(size: 10)); Text(L("La pantalla de esta tarea se envía a OpenAI. Esc detiene el control.")).font(.system(size: 9)).foregroundStyle(.secondary) }
+                VStack(alignment: .leading, spacing: 4) { Text(L("Aster verá la pantalla y usará el cursor durante esta tarea.")).font(.system(size: 10)); Text(LF("La pantalla de esta tarea se envía a %@. Esc detiene el control.", store.settings.providerName)).font(.system(size: 9)).foregroundStyle(.secondary) }
                 Spacer()
                 GlassAction(title: "Empezar en mi Mac", symbol: "cursorarrow.motionlines", prominent: true) { guard let agent = store.state.specialists.first(where: { $0.id == agentID }) else { return }; computer.start(task, agent: agent, settings: store.settings) }.disabled(task.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !computer.screenAllowed || !computer.controlAllowed)
             }
@@ -111,12 +106,12 @@ struct ComputerWorkspaceView: View {
                     Spacer()
                     Button(L("Mostrar esta copia")) { NSWorkspace.shared.activateFileViewerSelecting([Bundle.main.bundleURL]) }.font(.system(size: 10))
                 }
-            }.padding(12).background(.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 12))
-            HStack { Button(L("Abrir Privacidad y seguridad")) { NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security")!) }; Button(L("Comprobar permisos"), action: computer.refreshPermissions); Spacer(); Picker(L("Pantalla"), selection: $computer.selectedDisplay) { ForEach(Array(NSScreen.screens.enumerated()), id: \.offset) { index, screen in Text(screen.localizedName).tag((screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?.uint32Value ?? CGMainDisplayID()) } }.frame(maxWidth: 220) }.font(.system(size: 11))
+            }.padding(12).background(Color.asterWell, in: RoundedRectangle(cornerRadius: 12, style: .continuous)).overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Color.asterHairline, lineWidth: 1))
+            HStack { Button(L("Abrir Privacidad y seguridad")) { NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security")!) }.glassControl(); Button(L("Comprobar permisos"), action: computer.refreshPermissions).glassControl(); Spacer(); Picker(L("Pantalla"), selection: $computer.selectedDisplay) { ForEach(Array(NSScreen.screens.enumerated()), id: \.offset) { index, screen in Text(screen.localizedName).tag((screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?.uint32Value ?? CGMainDisplayID()) } }.frame(maxWidth: 220) }.font(.system(size: 11))
         }.padding(20).frostedSurface(21)
     }
     private func permission(_ title: String, detail: String, granted: Bool, action: @escaping () -> Void) -> some View {
-        HStack { Image(systemName: granted ? "checkmark.circle.fill" : "circle").foregroundStyle(.secondary); VStack(alignment: .leading, spacing: 4) { Text(L(title)).font(.system(size: 12, weight: .medium)); Text(L(detail)).font(.system(size: 10)).foregroundStyle(.secondary) }; Spacer(); if !granted { Button(L("Permitir"), action: action).font(.system(size: 11)) } }.frame(maxWidth: .infinity)
+        HStack { Image(systemName: granted ? "checkmark.circle.fill" : "circle").foregroundStyle(granted ? Color.green : Color.secondary); VStack(alignment: .leading, spacing: 4) { Text(L(title)).font(.system(size: 12, weight: .medium)); Text(L(detail)).font(.system(size: 10)).foregroundStyle(.secondary) }; Spacer(); if !granted { Button(L("Permitir"), action: action).glassControl(prominent: true) } }.frame(maxWidth: .infinity)
     }
 }
 struct ScreenLiveView: View {
@@ -141,6 +136,6 @@ struct ComputerHUD: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack { Image(systemName: "cursorarrow.motionlines"); Text("Aster").font(.system(size: 12, weight: .semibold)); Spacer(); Button(action: open) { Image(systemName: "arrow.up.right") }.buttonStyle(.plain); Button { computer.pause() } label: { Image(systemName: "pause.fill") }.buttonStyle(.plain); Button { computer.stop() } label: { Image(systemName: "stop.fill") }.buttonStyle(.plain).accessibilityLabel(L("Detener control del Mac")) }
             Text(L(computer.phase)).font(.system(size: 11)).lineLimit(2).frame(maxWidth: .infinity, alignment: .leading)
-        }.foregroundStyle(.white).padding(16).frame(width: 330, height: 102).background(Color(white: 0.1), in: RoundedRectangle(cornerRadius: 21)).overlay(RoundedRectangle(cornerRadius: 21).strokeBorder(.white.opacity(0.13))).padding(6)
+        }.padding(16).frame(width: 330, height: 102).glassChrome(RoundedRectangle(cornerRadius: 22, style: .continuous), shadow: false).padding(6).environment(\.colorScheme, .dark)
     }
 }

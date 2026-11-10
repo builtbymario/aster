@@ -9,7 +9,7 @@ final class AnthropicAPI: @unchecked Sendable {
     static let keyAccount = "anthropic-api-key"
     /// Models that may be declined by safety classifiers; the API retries those requests on a
     /// fallback model itself instead of stopping.
-    static let fallbackModels: Set<String> = ["claude-opus-5-5", "claude-opus-5", "claude-fable-5-1", "claude-sonnet-5-5"]
+    static let fallbackModels: Set<String> = ["claude-opus-5-5", "claude-opus-5", "claude-fable-5-2", "claude-fable-5-1", "claude-sonnet-5-5"]
     private let root: String
     private let key: String
     private let transport: URLSession

@@ -2,6 +2,23 @@
 
 Esta vista previa es nativa para **Apple Silicon e Intel, con macOS 14 o posterior**. Conserva tus personajes, conversaciones, empresas, memoria y preferencias de versiones anteriores. La app está firmada localmente y todavía no está notarizada para distribuirla a otros usuarios. Consulta **INSTALAR.md** antes de trasladarla a otro Mac; Intel se ha compilado, pero no probado en hardware real.
 
+## En desarrollo: vidrio líquido, paleta de comandos y un Inicio que resume tu día
+
+La interfaz se ha rehecho sobre un sistema de vidrio. La barra lateral, la barra de herramientas, el campo de mensaje, la paleta y el chat flotante usan **Liquid Glass real** en macOS 26 o posterior (y un material del sistema con el mismo borde luminoso en macOS 14 y 15); las tarjetas son vidrio esmerilado que no necesita su propio desenfoque, así que una página llena de ellas se desplaza sin coste. El fondo deja pasar el escritorio difuminado bajo un lavado del color de Aster y tres brillos fijos: nada se anima en reposo. Todo respeta **Reducir transparencia** y **Reducir movimiento**.
+
+- **Inicio** muestra lo que te espera: cuántas misiones hay en marcha, tareas pendientes, novedades y recuerdos; tus últimas conversaciones para retomarlas; las tareas de hoy, que puedes marcar o añadir sin salir; los modos, y los mensajes de tu semana día a día.
+- **⌘K** abre una paleta de comandos: salta a cualquier página, proyecto o misión, cambia de modo o de apariencia, crea una tarea o un proyecto, o pregúntale a Aster lo que has escrito. ⌘1 a ⌘9 cambian de página, ⌘L lleva al campo de mensaje y ⌘F busca entre las misiones.
+- **Misiones** se agrupan en Fijadas, Hoy, Ayer, Esta semana y Anteriores. Ahora se pueden **eliminar** (con Deshacer), y cada mensaje enseña sus acciones al pasar el cursor.
+- **Las respuestas se leen mejor**: listas numeradas y con viñetas, casillas, citas, tablas y separadores se dibujan como tales; el código se copia con un clic.
+- **Tareas** se añaden escribiendo y pulsando ↵, se agrupan en Vencidas, Hoy, Próximas y Sin fecha, y se pueden **editar y eliminar** (con Deshacer). Un anillo muestra cuántas llevas hechas.
+- **Bandeja** separa lo no leído, marca todo como leído de una vez y permite eliminar novedades. **Memoria** tiene búsqueda y un filtro de lo aprendido.
+- **Arrastra archivos** al campo de mensaje para adjuntarlos.
+- **Color**: en Ajustes → General → Aspecto (o en el botón de apariencia) eliges el acento: Aster, Océano, Rosa, Menta, Ámbar o Grafito.
+- Los avisos ya no interrumpen con una ventana: aparecen como una banda de vidrio arriba, y las confirmaciones breves, abajo.
+- Las fechas siguen el idioma de la interfaz, no el del Mac. En Ordenador, el aviso de privacidad nombra a quien recibe realmente la pantalla (Claude u OpenAI).
+
+Para revisar el diseño sin tocar tus datos ni tu clave, una compilación de depuración admite `ASTER_PREVIEW=1`: abre Aster sobre un espacio temporal con contenido de ejemplo, sin servicios ni atajo global. Con `ASTER_SNAPSHOTS=<carpeta>` guarda una imagen de cada página en claro y oscuro y se cierra.
+
 ## En desarrollo: rendimiento
 
 Aster en reposo ya casi no gasta: con la app recién abierta en Inicio usaba ~11 % de CPU porque la mascota se redibujaba hasta 60 veces por segundo. Ahora en reposo se anima a 12 fotogramas por segundo (respirar, mirar y parpadear se ven igual) y a ritmo completo solo cuando escucha, piensa, habla o pasas el cursor. Mientras usas otra app, la mascota de la ventana principal se queda quieta; la isla y la mascota flotante siguen vivas. Medido en este Mac: ~5 % con Aster delante y ~0–1 % con Aster detrás de otra app.
