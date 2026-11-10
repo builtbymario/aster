@@ -10,15 +10,22 @@ import SwiftUI
     var coach: ScreenCoach!
     var lastTarget: NSRunningApplication?
     var statusItem: NSStatusItem!
+    var trafficLights: TrafficLights?
     func applicationDidFinishLaunching(_ notification: Notification) {
         if let url = Bundle.main.url(forResource: "Aster", withExtension: "icns"), let icon = NSImage(contentsOf: url) {
             NSApplication.shared.applicationIconImage = icon
         }
-        PortableSetup.importPreparedKey()
+        #if DEBUG
+        let preview = PreviewSupport.enabled
+        #else
+        let preview = false
+        #endif
+        if !preview { PortableSetup.importPreparedKey() }
         AsterLanguage.migrateStoredChoice()
         #if DEBUG
         // Lets a development build run on a separate workspace, leaving the real one untouched.
-        store = AsterStore(directory: ProcessInfo.processInfo.environment["ASTER_DATA_DIR"].map { URL(fileURLWithPath: $0, isDirectory: true) })
+        if preview { store = AsterStore(directory: PreviewSupport.directory(), startServices: false); PreviewSupport.seed(store) }
+        else { store = AsterStore(directory: ProcessInfo.processInfo.environment["ASTER_DATA_DIR"].map { URL(fileURLWithPath: $0, isDirectory: true) }) }
         #else
         store = AsterStore()
         #endif
@@ -28,9 +35,11 @@ import SwiftUI
             store = nil; Task { await SelfCheck.run(directory: URL(fileURLWithPath: directory, isDirectory: true)) }; return
         }
         #endif
-        _ = store.remote
-        if store.needsOnboarding { store.onboarding = true }
-        else if !(store.settings.usesClaude ? AIProvider.anthropic : .openai).hasKey { store.page = "Conexiones" }
+        if !preview {
+            _ = store.remote
+            if store.needsOnboarding { store.onboarding = true }
+            else if !(store.settings.usesClaude ? AIProvider.anthropic : .openai).hasKey { store.page = "Conexiones" }
+        }
         #if DEBUG
         // Lets the welcome be reviewed on a Mac that is already set up.
         if ProcessInfo.processInfo.environment["ASTER_ONBOARDING"] == "1" { store.onboarding = true }
@@ -38,15 +47,16 @@ import SwiftUI
         let view = MainView(showCompanion: { [weak self] in self?.showCompanion() }).environmentObject(store)
         window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1180, height: 830), styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView], backing: .buffered, defer: false)
         window.title = "Aster"; window.titlebarAppearsTransparent = true; window.titleVisibility = .hidden
-        window.isReleasedWhenClosed = false; window.minSize = NSSize(width: 1020, height: 760)
+        window.isReleasedWhenClosed = false; window.minSize = NSSize(width: 1020, height: 720)
         window.isOpaque = false; window.backgroundColor = .clear; window.titlebarSeparatorStyle = .none
         window.contentView = NSHostingView(rootView: view); window.setFrameAutosaveName("AsterMain"); if !window.setFrameUsingName("AsterMain") { window.center() }
+        trafficLights = TrafficLights(window: window)
         companions = DesktopCompanions(store: store, open: { [weak self] in self?.openMain() })
         voiceShortcut = VoiceShortcut { [weak self] in self?.companions.dictate() }
         store.applyVoiceShortcut = { [weak self] enabled in
             if self?.voiceShortcut.setEnabled(enabled) == false { self?.store.notice = L("No se pudo registrar ⌥Espacio. Puede que otra app lo esté usando.") }
         }
-        store.applyVoiceShortcut?(store.state.preferences.voiceShortcut != false)
+        if !preview { store.applyVoiceShortcut?(store.state.preferences.voiceShortcut != false) }
         coach = ScreenCoach(store: store)
         store.applyDesktopStyle = { [weak self] style in
             self?.companions.setStyle(style)
@@ -111,6 +121,14 @@ import SwiftUI
         NSApplication.shared.mainMenu = mainMenu
         localizeMenus()
         NotificationCenter.default.addObserver(forName: UserDefaults.didChangeNotification, object: nil, queue: .main) { [weak self] _ in Task { @MainActor in self?.localizeMenus() } }
+        #if DEBUG
+        // A preview stays behind whatever the user is doing; pictures are taken and it quits.
+        if preview {
+            window.orderFrontRegardless()
+            if let folder = PreviewSupport.snapshotFolder { Task { await PreviewSupport.snapshot(window: window, store: store, folder: folder, showChat: { [weak self] in self?.companions.showChat("director", focus: true) }) } }
+            return
+        }
+        #endif
         openMain()
     }
     private func localizeMenus() {
@@ -157,6 +175,33 @@ import SwiftUI
         if coach.restoreFocus() { return true }
         if companions.restorePinnedChatFocus() { return true }
         openMain(); return true
+    }
+}
+
+/// Keeps the close, minimize and zoom buttons inside the sidebar's glass, clear of its rounded
+/// corner. AppKit puts them back whenever it lays the title bar out, so this follows the window.
+@MainActor final class TrafficLights {
+    static let origin = CGPoint(x: 24, y: 24)
+    private weak var window: NSWindow?
+    private var observers: [NSObjectProtocol] = []
+    init(window: NSWindow) {
+        self.window = window
+        for name in [NSWindow.didResizeNotification, NSWindow.didBecomeKeyNotification, NSWindow.didResignKeyNotification, NSWindow.didExitFullScreenNotification, NSWindow.didEnterFullScreenNotification, NSWindow.didChangeScreenNotification] {
+            observers.append(NotificationCenter.default.addObserver(forName: name, object: window, queue: .main) { [weak self] _ in Task { @MainActor in self?.place() } })
+        }
+        place()
+    }
+    deinit { for observer in observers { NotificationCenter.default.removeObserver(observer) } }
+    func place() {
+        guard let window, !window.styleMask.contains(.fullScreen) else { return }
+        let buttons = [NSWindow.ButtonType.closeButton, .miniaturizeButton, .zoomButton].compactMap { window.standardWindowButton($0) }
+        guard let first = buttons.first, let container = first.superview else { return }
+        let spacing = buttons.count > 1 ? buttons[1].frame.minX - first.frame.minX : 20
+        for (index, button) in buttons.enumerated() {
+            // `origin.y` is the buttons' centre measured down from the top of the title bar.
+            let y = container.isFlipped ? Self.origin.y - button.frame.height / 2 : container.bounds.height - Self.origin.y - button.frame.height / 2
+            button.setFrameOrigin(NSPoint(x: Self.origin.x + CGFloat(index) * spacing, y: y))
+        }
     }
 }
 

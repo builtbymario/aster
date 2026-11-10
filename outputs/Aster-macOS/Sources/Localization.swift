@@ -23,3 +23,21 @@ func L(_ key: String, language: String? = nil) -> String {
     return TranslationCatalog.values[language]?[key] ?? key
 }
 func LF(_ key: String, _ arguments: CVarArg...) -> String { String(format: L(key), locale: Locale(identifier: UserDefaults.standard.string(forKey: "AsterLanguage") ?? "es"), arguments: arguments) }
+
+/// Dates as the interface speaks them: in its language, not the Mac's.
+enum AsterDate {
+    static var locale: Locale { Locale(identifier: UserDefaults.standard.string(forKey: "AsterLanguage") ?? "es") }
+    /// "hace 5 horas", "ayer".
+    static func relative(_ date: Date) -> String { date.formatted(Date.RelativeFormatStyle(presentation: .named, locale: locale)) }
+    /// "8 nov".
+    static func day(_ date: Date) -> String { date.formatted(Date.FormatStyle(locale: locale).day().month(.abbreviated)) }
+    /// "Lunes, 9 de noviembre".
+    static func today(_ date: Date = Date()) -> String {
+        let text = date.formatted(Date.FormatStyle(locale: locale).weekday(.wide).day().month(.wide))
+        return text.prefix(1).uppercased() + text.dropFirst()
+    }
+    static func weekday(_ date: Date) -> String { date.formatted(Date.FormatStyle(locale: locale).weekday(.narrow)) }
+    static func stamp(_ date: Date, date dateStyle: Date.FormatStyle.DateStyle = .abbreviated, time: Date.FormatStyle.TimeStyle = .shortened) -> String {
+        date.formatted(Date.FormatStyle(date: dateStyle, time: time, locale: locale))
+    }
+}

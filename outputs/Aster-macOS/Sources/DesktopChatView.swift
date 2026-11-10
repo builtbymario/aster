@@ -45,7 +45,7 @@ struct DesktopChatView: View {
                     Text(L(error)).font(.system(size: 11)).foregroundStyle(.secondary).lineLimit(3)
                     Spacer(minLength: 0)
                     if recovering, let id = mission?.id { Button(L("Recuperar")) { store.recover(missionID: id) }.disabled(!store.hasCapacity).glassControl() }
-                }.padding(.horizontal, 14).padding(.vertical, 9).background(Color.asterRaised.opacity(0.6))
+                }.padding(.horizontal, 14).padding(.vertical, 9).background(Color.asterWell)
             }
             if !store.hasCapacity, !working {
                 Text(L("Se ha alcanzado el límite de trabajos simultáneos. Tu borrador se conserva.")).font(.system(size: 11)).foregroundStyle(.secondary).padding(.horizontal, 14).padding(.top, 8)
@@ -102,7 +102,7 @@ struct DesktopChatView: View {
                                             .padding(.horizontal, 12).padding(.vertical, 9).contentShape(Rectangle())
                                     }.buttonStyle(FluidButtonStyle())
                                 }
-                            }.frostedSurface(10).padding(.top, 4)
+                            }.background(Color.asterWell, in: RoundedRectangle(cornerRadius: 12, style: .continuous)).padding(.top, 4)
                         }.padding(.top, 6)
                     }
                     ForEach(mission?.messages ?? []) { message in
@@ -110,7 +110,7 @@ struct DesktopChatView: View {
                             if message.role == "user" {
                                 HStack { Spacer(minLength: 48)
                                     Text(verbatim: message.text).font(.system(size: 13)).lineSpacing(3).textSelection(.enabled)
-                                        .padding(.horizontal, 11).padding(.vertical, 8).background(Color.asterRaised, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                                        .padding(.horizontal, 12).padding(.vertical, 8).background(Color.asterAccentSoft, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
                                 }
                             } else { RichMessage(text: AsterMarkup.display(message.text)).equatable().frame(maxWidth: .infinity, alignment: .leading) }
                         }
@@ -139,7 +139,7 @@ struct DesktopChatView: View {
                 .onChange(of: changes) { _, _ in if following { proxy.scrollTo("desktop-bottom", anchor: .bottom) } }
                 .onChange(of: agentID) { _, _ in proxy.scrollTo("desktop-bottom", anchor: .bottom) }
                 .overlay(alignment: .bottomTrailing) {
-                    if !following { Button { following = true; proxy.scrollTo("desktop-bottom", anchor: .bottom) } label: { Image(systemName: "arrow.down").font(.system(size: 11)).frame(width: 28, height: 28).liquidSurface(14, interactive: true) }.buttonStyle(.plain).accessibilityLabel(L("Ir al último mensaje")).padding(10) }
+                    if !following { Button { following = true; proxy.scrollTo("desktop-bottom", anchor: .bottom) } label: { Image(systemName: "arrow.down").font(.system(size: 11)).frame(width: 28, height: 28).background(Color.asterSurface, in: Circle()).overlay(Circle().strokeBorder(Color.asterHairlineStrong, lineWidth: 0.5)) }.buttonStyle(.plain).accessibilityLabel(L("Ir al último mensaje")).padding(10) }
                 }
         }
     }
@@ -151,26 +151,26 @@ struct DesktopChatView: View {
                 Button { desktop.shareScreen.toggle() } label: {
                     Image(systemName: desktop.shareScreen ? "eye.fill" : "eye").font(.system(size: 12, weight: .medium))
                         .foregroundStyle(desktop.shareScreen ? Color.asterOnAccent : Color.primary).frame(width: 30, height: 30)
-                        .background(desktop.shareScreen ? Color.asterAccent : Color.asterSurface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-                        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(desktop.shareScreen ? Color.clear : Color.asterHairlineStrong, lineWidth: 0.5))
+                        .background(desktop.shareScreen ? Color.asterAccent : Color.asterWell, in: Circle())
+                        .overlay(Circle().strokeBorder(desktop.shareScreen ? Color.clear : Color.asterHairline, lineWidth: 1))
                 }.buttonStyle(FluidButtonStyle()).accessibilityLabel(L("Preguntar sobre mi pantalla")).help(L("Preguntar sobre mi pantalla"))
                 DictationButton(listener: store.listener) { desktop.dictate(agentID) }
                 if working {
                     Button { store.stop(missionID: mission?.id) } label: {
-                        Image(systemName: "stop.fill").font(.system(size: 10)).frame(width: 30, height: 30).background(Color.asterRaised, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                        Image(systemName: "stop.fill").font(.system(size: 10)).frame(width: 30, height: 30).background(Color.asterWell, in: Circle())
                     }.buttonStyle(FluidButtonStyle()).accessibilityLabel(L("Detener"))
                 } else {
                     let empty = draft.wrappedValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                     Button { desktop.send() } label: {
                         Image(systemName: "arrow.up").font(.system(size: 12, weight: .semibold)).frame(width: 30, height: 30)
                             .foregroundStyle(empty ? Color.asterMuted : Color.asterOnAccent)
-                            .background(empty ? Color.asterRaised : Color.asterAccent, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                            .background(empty ? Color.asterWell : Color.asterAccent, in: Circle())
                     }.buttonStyle(FluidButtonStyle()).disabled(!store.hasCapacity || recovering || empty)
                         .accessibilityLabel(L("Enviar mensaje a Aster"))
                 }
             }.padding(6)
-                .background(Color.asterCanvas, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-                .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(store.listener.active || desktop.shareScreen ? Color.asterAccent : Color.asterHairlineStrong, lineWidth: store.listener.active || desktop.shareScreen ? 1 : 0.5))
+                .background(Color.asterWell, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).strokeBorder(store.listener.active || desktop.shareScreen ? Color.asterAccent : Color.asterHairline, lineWidth: 1))
             MonoLabel(L(desktop.shareScreen ? "Se enviará una captura de tu pantalla" : "↵ enviar · ⇧↵ línea · ⌥espacio hablar"), color: desktop.shareScreen ? .asterAccent : .asterMuted, size: 9).padding(.leading, 4)
         }
     }
@@ -192,9 +192,9 @@ private struct ChatChrome: ViewModifier {
     var scheme: ColorScheme?
     @ViewBuilder func body(content: Content) -> some View {
         if enabled {
-            content.background(Color.asterSurface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(Color.asterHairlineStrong, lineWidth: 0.5))
-                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous)).padding(1)
+            // The quick chat floats over other apps, so its whole card is glass.
+            content.clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+                .glassChrome(RoundedRectangle(cornerRadius: 22, style: .continuous), shadow: false).padding(1)
                 .preferredColorScheme(scheme)
         } else { content }
     }
@@ -210,8 +210,8 @@ struct DictationButton: View {
                 .symbolEffect(.variableColor.iterative, isActive: listener.phase == .listening)
                 .foregroundStyle(listener.active ? Color.asterOnAccent : Color.primary)
                 .frame(width: 30, height: 30)
-                .background(listener.active ? Color.asterAccent : Color.asterSurface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-                .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(listener.active ? Color.clear : Color.asterHairlineStrong, lineWidth: 0.5))
+                .background(listener.active ? Color.asterAccent : Color.asterWell, in: Circle())
+                .overlay(Circle().strokeBorder(listener.active ? Color.clear : Color.asterHairline, lineWidth: 1))
         }.buttonStyle(FluidButtonStyle())
             .accessibilityLabel(L(listener.active ? "Terminar de dictar" : "Hablar"))
             .help(L(listener.active ? "Terminar de dictar" : "Hablar · ⌥Espacio"))

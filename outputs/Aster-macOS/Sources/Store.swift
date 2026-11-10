@@ -38,6 +38,10 @@ import Combine
     }
     private var runtimes: [UUID: Runtime] = [:]
     @Published var notice = ""
+    /// A brief confirmation at the bottom of the window, sometimes with an undo.
+    @Published var toast: AsterToast?
+    /// The command palette (⌘K) is open over the window.
+    @Published var paletteOpen = false
     @Published var calendarStatus = "Sin conectar"
     @Published var mailStatus = "Sin conectar"
     @Published var connectionStatus = "Sin comprobar"
@@ -251,16 +255,20 @@ import Combine
         guard !mainWorking else { return }
         let panel = NSOpenPanel(); panel.allowsMultipleSelection = true; panel.canChooseDirectories = false
         panel.message = LF("Los archivos que adjuntes se enviarán a %@ al iniciar la misión.", settings.providerName)
-        if panel.runModal() == .OK {
-            for url in panel.urls {
-                do {
-                    let values = try url.resourceValues(forKeys: [.fileSizeKey])
-                    guard (values.fileSize ?? Int.max) <= Attachment.maximumBytes, attachments.count < 10 else { throw AsterError.message("Máximo 10 archivos y 10 MB en total por misión.") }
-                    let data = try Data(contentsOf: url)
-                    guard attachments.reduce(0, { $0 + $1.data.count }) + data.count <= Attachment.maximumBytes else { throw AsterError.message("Máximo 10 archivos y 10 MB en total por misión.") }
-                    attachments.append(.init(name: url.lastPathComponent, data: data))
-                } catch { notice = error.localizedDescription }
-            }
+        if panel.runModal() == .OK { attach(panel.urls) }
+    }
+    /// Adds files chosen in the panel or dropped on the composer, within the limits of a mission.
+    func attach(_ urls: [URL]) {
+        guard !mainWorking else { return }
+        for url in urls {
+            do {
+                let values = try url.resourceValues(forKeys: [.fileSizeKey, .isDirectoryKey])
+                guard values.isDirectory != true else { continue }
+                guard (values.fileSize ?? Int.max) <= Attachment.maximumBytes, attachments.count < 10 else { throw AsterError.message("Máximo 10 archivos y 10 MB en total por misión.") }
+                let data = try Data(contentsOf: url)
+                guard attachments.reduce(0, { $0 + $1.data.count }) + data.count <= Attachment.maximumBytes else { throw AsterError.message("Máximo 10 archivos y 10 MB en total por misión.") }
+                attachments.append(.init(name: url.lastPathComponent, data: data))
+            } catch { notice = error.localizedDescription }
         }
     }
     func removeAttachment(_ id: UUID) { attachments.removeAll { $0.id == id } }

@@ -201,6 +201,9 @@ struct IslandView: View {
             shape.fill(Color.black)
                 .shadow(color: Color.asterRing.opacity(mood == .listening ? 0.55 : 0), radius: 18, y: 4)
                 .shadow(color: .black.opacity(open ? 0.3 : 0), radius: 22, y: 10)
+            // Open, the island catches a little light along its lower edge, like glass.
+            shape.stroke(LinearGradient(colors: [.clear, .clear, .white.opacity(open ? 0.16 : 0)], startPoint: .top, endPoint: .bottom), lineWidth: 1)
+                .allowsHitTesting(false)
             if open {
                 VStack(spacing: 0) {
                     Color.clear.frame(height: island.layout.notch.height)

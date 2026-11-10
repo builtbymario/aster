@@ -5,6 +5,8 @@ struct SettingsView: View {
     @AppStorage("AsterLanguage") private var language = "es"
     @State private var tab = "General"
     @State private var openAtLogin = LoginItem.enabled
+    @AppStorage("AsterAppearance") private var appearance = AsterAppearance.system.rawValue
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     private let tabs = ["General", "Conexiones", "Voz y Mac", "Avanzado"]
     private func option<Value>(_ path: WritableKeyPath<IntelligenceSettings, Value>) -> Binding<Value> {
         Binding(get: { store.settings[keyPath: path] }, set: { value in var settings = store.settings; settings[keyPath: path] = value; store.settings = settings })
@@ -15,26 +17,30 @@ struct SettingsView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(L("Aster, a tu manera.")).font(.asterDisplay(30)).tracking(-0.8)
-                    Text(L("Lo esencial está en General; el resto, cuando lo necesites.")).font(.system(size: 12)).foregroundStyle(.secondary)
-                }
-                Picker(L("Ajustes"), selection: $tab) { ForEach(tabs, id: \.self) { Text(L($0)).tag($0) } }.pickerStyle(.segmented).labelsHidden().frame(maxWidth: 460)
-                switch tab {
-                case "Conexiones": connections
-                case "Voz y Mac": voices
-                case "Avanzado": advanced
-                default: general
-                }
-            }.padding(.horizontal, 22).padding(.top, 9).padding(.bottom, 28).frame(maxWidth: 820, alignment: .leading)
+                PageHeader(title: "Aster, a tu manera.", subtitle: "Lo esencial está en General; el resto, cuando lo necesites.")
+                GlassSegmented(options: tabs.map { ($0, L($0)) }, selection: $tab).frame(maxWidth: 480)
+                Group {
+                    switch tab {
+                    case "Conexiones": connections
+                    case "Voz y Mac": voices
+                    case "Avanzado": advanced
+                    default: general
+                    }
+                }.id(tab).transition(.opacity)
+            }.padding(.horizontal, 16).padding(.top, 6).padding(.bottom, 28).frame(maxWidth: 820, alignment: .leading).frame(maxWidth: .infinity)
         }.scrollIndicators(.hidden)
     }
     /// What most people change: their AI, how deep it thinks, and how it talks to them.
     private var general: some View {
         VStack(spacing: 18) {
             AIConnectionView()
+            card("Aspecto", icon: "paintpalette") {
+                HStack { Text(L("Apariencia")); Spacer(); GlassSegmented(options: AsterAppearance.allCases.map { ($0.rawValue, L($0.rawValue)) }, selection: $appearance).frame(width: 260) }
+                HStack { Text(L("Color")); Spacer(); AccentPicker() }
+                Text(L("El vidrio se adapta solo a Reducir transparencia y Reducir movimiento de macOS.")).font(.system(size: 11)).foregroundStyle(.secondary)
+            }
             card("Tú y Aster", icon: "person.crop.circle") {
-                TextField(L("Cómo quieres que te llame"), text: option(\.userName)).textFieldStyle(.roundedBorder)
+                TextField(L("Cómo quieres que te llame"), text: option(\.userName)).textFieldStyle(.aster)
                 Picker(L("Idioma de la interfaz"), selection: $language) { ForEach(AsterLanguage.allCases, id: \.rawValue) { Text($0.name).tag($0.rawValue) } }
                 Picker(L("Idioma de las respuestas"), selection: option(\.responseLanguage)) {
                     Text(L("El de mi mensaje")).tag("auto")
@@ -66,7 +72,7 @@ struct SettingsView: View {
             }
             card("Tus instrucciones", icon: "text.quote") {
                 Text(L("Lo que Aster debe tener siempre en cuenta: cómo trabajas, qué estudias, tu estilo…")).font(.system(size: 11)).foregroundStyle(.secondary)
-                TextEditor(text: option(\.instructions)).font(.system(size: 12)).scrollContentBackground(.hidden).frame(height: 85).padding(10).background(.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 12))
+                TextEditor(text: option(\.instructions)).font(.system(size: 12)).scrollContentBackground(.hidden).frame(height: 85).padding(10).background(Color.asterWell, in: RoundedRectangle(cornerRadius: 12, style: .continuous)).overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Color.asterHairline, lineWidth: 1))
             }
             card("Memoria y contexto", icon: "brain") {
                 Toggle(L("Usar la memoria guardada"), isOn: option(\.useMemory)).toggleStyle(.switch)
@@ -109,7 +115,7 @@ struct SettingsView: View {
             }
             card("Apple Salud", icon: "heart") {
                 if let health = store.state.health {
-                    HStack { Text(L("Última importación:") + " " + health.imported.formatted(date: .abbreviated, time: .shortened)).font(.system(size: 11)); Spacer(); Button(L("Eliminar datos de Salud")) { store.state.health = nil; store.save() } }
+                    HStack { Text(L("Última importación:") + " " + AsterDate.stamp(health.imported, date: .abbreviated, time: .shortened)).font(.system(size: 11)); Spacer(); Button(L("Eliminar datos de Salud")) { store.state.health = nil; store.save() } }
                     Text(LF("%d registros · %d tipos de datos", health.recordCount, health.metrics.count)).font(.system(size: 10)).foregroundStyle(.secondary)
                 }
                 Text(L("Salud no permite leer sus datos directamente desde macOS. Puedes importar export.xml desde Salud → tu perfil → Exportar todos los datos de salud en el iPhone y preguntarle a Aster por esos registros. La importación muestra su fecha y no se actualiza sola.")).font(.system(size: 11)).foregroundStyle(.secondary).lineSpacing(4)
@@ -182,9 +188,9 @@ struct SettingsView: View {
                     HStack { hourPicker("Desde", path: \.quietStart, fallback: 23); hourPicker("Hasta", path: \.quietEnd, fallback: 7) }
                 }
                 Text(L("Objetivo de las misiones autónomas")).font(.system(size: 11, weight: .medium))
-                TextEditor(text: Binding(get: { store.state.preferences.autonomousBrief ?? "" }, set: { store.state.preferences.autonomousBrief = $0; store.save() })).font(.system(size: 12)).frame(height: 75).scrollContentBackground(.hidden).padding(10).background(.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 12))
+                TextEditor(text: Binding(get: { store.state.preferences.autonomousBrief ?? "" }, set: { store.state.preferences.autonomousBrief = $0; store.save() })).font(.system(size: 12)).frame(height: 75).scrollContentBackground(.hidden).padding(10).background(Color.asterWell, in: RoundedRectangle(cornerRadius: 12, style: .continuous)).overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Color.asterHairline, lineWidth: 1))
                 Text(LF("Misiones iniciadas hoy: %d de %d", store.state.preferences.dailyRuns, store.state.preferences.dailyLimit)).font(.system(size: 11)).foregroundStyle(.secondary)
-                if let next = store.nextAutonomous { Text(L("Próxima revisión a partir de:") + " " + next.formatted(date: .abbreviated, time: .shortened)).font(.system(size: 11)).foregroundStyle(.secondary) }
+                if let next = store.nextAutonomous { Text(L("Próxima revisión a partir de:") + " " + AsterDate.stamp(next, date: .abbreviated, time: .shortened)).font(.system(size: 11)).foregroundStyle(.secondary) }
                 if store.companies.isEmpty { Text(L("Añade un proyecto para activar estas misiones.")).font(.system(size: 11)).foregroundStyle(.secondary) }
                 Text(L("El trabajo autónomo se pausa cuando una misión falla. Revisa la bandeja antes de volver a activarlo.")).font(.system(size: 10)).foregroundStyle(.secondary)
             }
@@ -198,9 +204,12 @@ struct SettingsView: View {
         Picker(L(title), selection: Binding(get: { store.state.preferences[keyPath: path] ?? fallback }, set: { store.state.preferences[keyPath: path] = $0; store.save() })) { ForEach(0..<24) { Text(String(format: "%02d:00", $0)).tag($0) } }
     }
     private func card<Content: View>(_ title: String, icon: String, @ViewBuilder content: () -> Content) -> some View {
-        VStack(alignment: .leading, spacing: 15) {
-            Label(L(title), systemImage: icon).font(.asterDisplay(15))
-            content().font(.system(size: 12))
-        }.padding(22).frame(maxWidth: .infinity, alignment: .leading).frostedSurface(23)
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 10) {
+                Image(systemName: icon).font(.system(size: 12, weight: .semibold)).foregroundStyle(Color.asterAccent).frame(width: 28, height: 28).background(Color.asterAccentSoft, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+                Text(L(title)).font(.asterDisplay(15))
+            }
+            content().font(.system(size: 12)).buttonStyle(AsterButtonStyle())
+        }.padding(20).frame(maxWidth: .infinity, alignment: .leading).frostedSurface(20)
     }
 }
